@@ -63,10 +63,10 @@ mod tests {
     use compression::bios::{decompress_lz77, compress_lz77};
 
     #[test]
-    fn test_decompress_lz77_1() {
+    fn test_decompress_1() {
     }
 
     #[test]
-    fn test_compress_lz77_1() {
+    fn test_compress_1() {
     }
 }

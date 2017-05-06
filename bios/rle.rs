@@ -55,12 +55,59 @@ pub fn compress_rle<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Resul
 #[cfg(test)]
 mod tests {
     use compression::bios::{decompress_rle, compress_rle};
+    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
-    fn test_decompress_rle_1() {
+    fn test_decompress_1() {
+        let input: Vec<u8> = vec![
+            0x30, 0x08, 0x00, 0x00,
+            0x03, 0x01, 0x02, 0x03, 0x04,
+            0x81, 0x05,
+        ];
+        let expected_output: Vec<u8> = vec![
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x05, 0x05, 0x05,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert_eq!(output, expected_output);
     }
 
     #[test]
-    fn test_compress_rle_1() {
+    fn test_decompress_2() {
+        let input: Vec<u8> = vec![
+            0x30, 0x04, 0x00, 0x00,
+            0x04, 0x01, 0x02, 0x03, 0x04, 0x05,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        assert!(decompress_rle(&mut Cursor::new(&input[..]), &mut output).is_err());
+    }
+
+    #[test]
+    fn test_decompress_3() {
+        let input: Vec<u8> = vec![
+            0x30, 0x04, 0x00, 0x00,
+            0x82, 0x01,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        assert!(decompress_rle(&mut Cursor::new(&input[..]), &mut output).is_err());
+    }
+
+    #[test]
+    fn test_decompress_4() {
+        let input: Vec<u8> = vec![
+            0x30, 0x00, 0x00, 0x00,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_compress_1() {
     }
 }

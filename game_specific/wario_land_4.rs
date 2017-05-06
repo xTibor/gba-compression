@@ -1,9 +1,11 @@
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt};
 
+// TODO: Investigate: Is 0x80/0x8000 an end of stream mark like 0x00/0x0000?
+
 /// Decompression routine for Wario Land 4 run-length encoded data
 /// Operates on 8-bit data but run-lengths can be 8 or 16-bit.
-/// Based on my old FPC/Lazarus code. Compiles but untested.
+/// Based on my old FPC/Lazarus code.
 #[allow(dead_code)]
 pub fn decompress_wl4_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
     let mut buffer: Vec<u8> = Vec::with_capacity(4096);
@@ -68,12 +70,67 @@ pub fn compress_wl4_rle<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> R
 #[cfg(test)]
 mod tests {
     use compression::game_specific::wario_land_4::{decompress_wl4_rle, compress_wl4_rle};
+    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
-    fn test_decompress_wl4_rle_1() {
+    fn test_decompress_1() {
+        let input: Vec<u8> = vec![
+            0x01,
+            0x04, 0x01, 0x02, 0x03, 0x04,
+            0x84, 0x05,
+            0x00,
+        ];
+        let expected_output: Vec<u8> = vec![
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x05, 0x05, 0x05,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_wl4_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert_eq!(output, expected_output);
     }
 
     #[test]
-    fn test_compress_wl4_rle_1() {
+    fn test_decompress_2() {
+        let input: Vec<u8> = vec![
+            0x02,
+            0x04, 0x00, 0x01, 0x02, 0x03, 0x04,
+            0x04, 0x80, 0x05,
+            0x00, 0x00,
+        ];
+        let expected_output: Vec<u8> = vec![
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x05, 0x05, 0x05,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_wl4_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_decompress_3() {
+        let input: Vec<u8> = vec![
+            0x01, 0x00,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_wl4_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_decompress_4() {
+        let input: Vec<u8> = vec![
+            0x02, 0x00, 0x00,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_wl4_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_compress() {
     }
 }

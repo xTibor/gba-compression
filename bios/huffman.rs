@@ -17,10 +17,10 @@ mod tests {
     use compression::bios::{decompress_huffman, compress_huffman};
 
     #[test]
-    fn test_decompress_huffman_1() {
+    fn test_decompress_1() {
     }
 
     #[test]
-    fn test_compress_huffman_1() {
+    fn test_compress_1() {
     }
 }
