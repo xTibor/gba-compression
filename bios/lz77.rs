@@ -34,7 +34,6 @@ pub fn decompress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resu
                         return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
                     }
 
-                    // TODO: I'm not sure about the following condition, write tests for it.
                     if offset + 1 > buffer.len() {
                         return Err(Error::new(ErrorKind::InvalidData, "Offset out of bounds"));
                     }
@@ -61,9 +60,41 @@ pub fn compress_lz77<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Resu
 #[cfg(test)]
 mod tests {
     use compression::bios::{decompress_lz77, compress_lz77};
+    use std::io::{Cursor, Seek, SeekFrom};
+
+    // TODO: Add tests for out of bounds cases
 
     #[test]
     fn test_decompress_1() {
+        let input: Vec<u8> = vec![
+            0x10, 0x10, 0x00, 0x00,
+            0x0C,
+            0x01, 0x02, 0x03, 0x04,
+            0x10, 0x03,
+            0x50, 0x07,
+
+        ];
+        let expected_output: Vec<u8> = vec![
+            0x01, 0x02, 0x03, 0x04,
+            0x01, 0x02, 0x03, 0x04,
+            0x01, 0x02, 0x03, 0x04,
+            0x01, 0x02, 0x03, 0x04,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_lz77(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert_eq!(output, expected_output);
+    }
+
+    #[test]
+    fn test_decompress_2() {
+        let input: Vec<u8> = vec![
+            0x10, 0x00, 0x00, 0x00,
+        ];
+
+        let mut output: Vec<u8> = Vec::new();
+        decompress_lz77(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        assert!(output.is_empty());
     }
 
     #[test]

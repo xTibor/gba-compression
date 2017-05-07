@@ -15,6 +15,7 @@ pub fn compress_huffman<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> R
 #[cfg(test)]
 mod tests {
     use compression::bios::{decompress_huffman, compress_huffman};
+    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
     fn test_decompress_1() {
