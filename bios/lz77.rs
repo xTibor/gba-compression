@@ -1,4 +1,5 @@
 use std::io::{Read, Write, Result, Error, ErrorKind};
+use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
 
@@ -64,12 +65,26 @@ pub fn compress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
     input.read_to_end(&mut buffer)?;
 
     let mut blocks: Vec<Block> = Vec::new();
-    let mut offset = 0;
-    while offset < buffer.len() {
-        // TODO: Find backreferences
-        blocks.push(Block::Uncompressed { data: buffer[offset] });
-
-        offset += 1;
+    let mut index = 0;
+    'outer: while index < buffer.len() {
+        let block_max_length = cmp::min(buffer.len() - index, 18);
+        for length in (3..block_max_length + 1).rev() {
+            let mut offset = 0;
+            while (offset <= 0xFFF) && (index >= offset + 1) {
+                let index_back = index - (offset + 1);
+                if &buffer[index..index + length] == &buffer[index_back..index_back + length] {
+                    blocks.push(Block::Backreference {
+                        offset: offset as u16,
+                        length: length as u8,
+                    });
+                    index += length;
+                    continue 'outer;
+                }
+                offset += 1;
+            }
+        }
+        blocks.push(Block::Uncompressed { data: buffer[index] });
+        index += 1;
     }
 
     output.write_u8((BiosCompressionType::Lz77 as u8) << 4)?;
@@ -173,6 +188,17 @@ mod tests {
             0x01, 0x02, 0x03, 0x04,
             0x05, 0x05, 0x05, 0x05,
         ];
+
+        let mut immediate: Vec<u8> = Vec::new();
+        let mut output: Vec<u8> = Vec::new();
+        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
+        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        assert_eq!(input, output);
+    }
+
+    #[test]
+    fn test_compress_and_decompress_3() {
+        let input: Vec<u8> = vec![0x13, 4096];
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
