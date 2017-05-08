@@ -69,9 +69,11 @@ pub fn compress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
     'outer: while index < buffer.len() {
         let block_max_length = cmp::min(buffer.len() - index, 18);
         for length in (3..block_max_length + 1).rev() {
-            let mut offset = 0;
-            while (offset <= 0xFFF) && (index >= offset + 1) {
-                let index_back = index - (offset + 1);
+            // TODO: Is overlapping tolerated by the BIOS decompression routine?
+            // The `offset` counter has to start at `length` if not.
+            let mut offset = 1;
+            while (offset <= 4096) && (index >= offset) {
+                let index_back = index - offset;
                 if &buffer[index..index + length] == &buffer[index_back..index_back + length] {
                     blocks.push(Block::Backreference {
                         offset: offset as u16,
@@ -106,8 +108,8 @@ pub fn compress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
                 },
                 Block::Backreference { offset, length } => {
                     assert!((length >= 3) & (length <= 18), "length must be between 3 and 18");
-                    assert_eq!(offset >> 12, 0, "offset must be 12-bit");
-                    let data = ((offset & 0xFF) << 8) | ((length - 3) << 4) as u16 | (offset >> 8);
+                    assert!((offset >= 1) & (offset <= 4096), "offset must be between 1 and 4096");
+                    let data = (((offset - 1) & 0xFF) << 8) | ((length - 3) << 4) as u16 | ((offset - 1) >> 8);
                     output.write_u16::<LittleEndian>(data)?;
                 },
             }
@@ -199,6 +201,21 @@ mod tests {
     #[test]
     fn test_compress_and_decompress_3() {
         let input: Vec<u8> = vec![0x13, 4096];
+
+        let mut immediate: Vec<u8> = Vec::new();
+        let mut output: Vec<u8> = Vec::new();
+        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
+        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        assert_eq!(input, output);
+    }
+
+    #[test]
+    fn test_compress_and_decompress_4() {
+        let input: Vec<u8> = vec![
+            0x01, 0x02, 0x03, 0x04,
+            0x05, 0x06, 0x07, 0x08,
+            0x02, 0x03, 0x01, 0x02,
+        ];
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
