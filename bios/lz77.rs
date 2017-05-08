@@ -9,11 +9,7 @@ pub fn decompress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resu
         return Err(Error::new(ErrorKind::InvalidData, "Not an LZ77 encoded stream"));
     }
 
-    //let decompressed_size: usize = input.read_u24::<LittleEndian>()?;
-    let decompressed_size: usize = (input.read_u8()? as usize) +
-        ((input.read_u8()? as usize) << 8) +
-        ((input.read_u8()? as usize) << 16);
-
+    let decompressed_size: usize = input.read_u24::<LittleEndian>()? as usize;
     let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
 
     while buffer.len() < decompressed_size {

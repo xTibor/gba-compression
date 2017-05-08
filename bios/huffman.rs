@@ -1,6 +1,7 @@
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
+use utils::{ReadBytesExtExt, WriteBytesExtExt};
 
 #[allow(dead_code)]
 pub fn decompress_huffman<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Result<()> {

@@ -1,5 +1,5 @@
 use std::io::{Read, Write, Result, Error, ErrorKind};
-use byteorder::ReadBytesExt;
+use byteorder::{LittleEndian, ReadBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
 
 /// Decompression routine for GBA BIOS run-length encoded data
@@ -10,11 +10,7 @@ pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resul
         return Err(Error::new(ErrorKind::InvalidData, "Not an run-length encoded stream"));
     }
 
-    //let decompressed_size: usize = input.read_u24::<LittleEndian>()?;
-    let decompressed_size: usize = (input.read_u8()? as usize) +
-        ((input.read_u8()? as usize) << 8) +
-        ((input.read_u8()? as usize) << 16);
-
+    let decompressed_size: usize = input.read_u24::<LittleEndian>()? as usize;
     let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
 
     while buffer.len() < decompressed_size {

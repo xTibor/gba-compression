@@ -11,11 +11,7 @@ pub fn decompress_diff_filter<R: Read, W: Write>(input: &mut R, output: &mut W) 
     }
 
     let stream_type = header & 0xF;
-
-    //let decompressed_size: usize = input.read_u24::<LittleEndian>()?;
-    let decompressed_size: usize = (input.read_u8()? as usize) +
-        ((input.read_u8()? as usize) << 8) +
-        ((input.read_u8()? as usize) << 16);
+    let decompressed_size: usize = input.read_u24::<LittleEndian>()? as usize;
 
     if stream_type == 1 {
         // 8-bit stream
