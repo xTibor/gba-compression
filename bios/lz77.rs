@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn test_compress_and_decompress_3() {
-        let input: Vec<u8> = vec![0x13, 4096];
+        let input: Vec<u8> = vec![0x13; 4096];
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
