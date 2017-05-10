@@ -1,5 +1,5 @@
 use std::io::{Read, Write, Result, Error, ErrorKind};
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 
 // TODO: Investigate: Is 0x80/0x8000 an end of stream mark like 0x00/0x0000?
 
@@ -36,7 +36,7 @@ pub fn decompress_wl4_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> R
     } else if stream_type == 2 {
         // 16-bit RLE stream
         loop {
-            let block = input.read_u16::<LittleEndian>()?;
+            let block = input.read_u16::<BigEndian>()?;
             if block == 0 {
                 // End of stream
                 break;
