@@ -9,9 +9,9 @@ pub fn consecutive_count<T: ::std::cmp::Eq>(buffer: &[T], max_length: usize) -> 
     count
 }
 
-pub fn non_consecutive_count<T: ::std::cmp::Eq>(buffer: &[T], max_length: usize) -> usize {
+pub fn non_consecutive_count<T: ::std::cmp::Eq>(buffer: &[T], max_length: usize, consecutive_threshold: usize) -> usize {
     let mut count = 0;
-    while (count < buffer.len()) && (count < max_length) && (consecutive_count(&buffer[count..], max_length) == 1) {
+    while (count < buffer.len()) && (count < max_length) && (consecutive_count(&buffer[count..], max_length) < consecutive_threshold) {
         count += 1;
     }
     count

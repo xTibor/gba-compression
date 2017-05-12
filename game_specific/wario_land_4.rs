@@ -68,6 +68,7 @@ pub fn decompress_wl4_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> R
     output.write_all(&buffer)
 }
 
+// TODO: Extract this stream comparison function to the parent module
 #[allow(dead_code)]
 pub fn compress_wl4_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
     let mut buffer_input: Vec<u8> = Vec::new();
@@ -95,7 +96,7 @@ pub fn compress_wl4_rle8<R: Read, W: Write>(input: &mut R, output: &mut W) -> Re
     while offset < buffer.len() {
         let length = consecutive_count(&buffer[offset..], 0x7F);
         if length == 1 {
-            let length = non_consecutive_count(&buffer[offset..], 0x7F);
+            let length = non_consecutive_count(&buffer[offset..], 0x7F, 2);
             output.write_u8(length as u8)?;
             output.write_all(&buffer[offset..offset+length])?;
             offset += length;
@@ -119,7 +120,7 @@ pub fn compress_wl4_rle16<R: Read, W: Write>(input: &mut R, output: &mut W) -> R
     while offset < buffer.len() {
         let length = consecutive_count(&buffer[offset..], 0x7FFF);
         if length == 1 {
-            let length = non_consecutive_count(&buffer[offset..], 0x7FFF);
+            let length = non_consecutive_count(&buffer[offset..], 0x7FFF, 2);
             output.write_u16::<BigEndian>(length as u16)?;
             output.write_all(&buffer[offset..offset+length])?;
             offset += length;

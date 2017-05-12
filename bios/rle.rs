@@ -56,7 +56,7 @@ pub fn compress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<
     while offset < buffer.len() {
         let length = consecutive_count(&buffer[offset..], 0x82);
         if length < 3 {
-            let length = non_consecutive_count(&buffer[offset..], 0x80);
+            let length = non_consecutive_count(&buffer[offset..], 0x80, 3);
             output.write_u8(length as u8 - 1)?;
             output.write_all(&buffer[offset..offset+length])?;
             offset += length;
