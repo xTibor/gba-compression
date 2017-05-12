@@ -1,6 +1,7 @@
-use std::io::{Read, Write, Result, Error, ErrorKind};
-use byteorder::{LittleEndian, ReadBytesExt};
+use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
+use compression::{consecutive_count, non_consecutive_count};
 
 /// Decompression routine for GBA BIOS run-length encoded data
 /// Compiles but untested
@@ -44,8 +45,29 @@ pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resul
 }
 
 #[allow(dead_code)]
-pub fn compress_rle<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Result<()> {
-    Err(Error::new(ErrorKind::Other, "Unimplemented compression routine"))
+pub fn compress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
+    let mut buffer: Vec<u8> = Vec::new();
+    input.read_to_end(&mut buffer)?;
+
+    output.write_u8((BiosCompressionType::Rle as u8) << 4)?;
+    output.write_u24::<LittleEndian>(buffer.len() as u32)?;
+
+    let mut offset = 0;
+    while offset < buffer.len() {
+        let length = consecutive_count(&buffer[offset..], 0x82);
+        if length < 3 {
+            let length = non_consecutive_count(&buffer[offset..], 0x80);
+            output.write_u8(length as u8 - 1)?;
+            output.write_all(&buffer[offset..offset+length])?;
+            offset += length;
+        } else {
+            output.write_u8(0x80 | (length as u8 - 3))?;
+            output.write_u8(buffer[offset])?;
+            offset += length;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -104,6 +126,40 @@ mod tests {
     }
 
     #[test]
-    fn test_compress_1() {
+    fn test_compress_and_decompress_1() {
+        let input: Vec<u8> = Vec::new();
+
+        let mut immediate: Vec<u8> = Vec::new();
+        let mut output: Vec<u8> = Vec::new();
+        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
+        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        assert_eq!(input, output);
+    }
+
+    #[test]
+    fn test_compress_and_decompress_2() {
+        let input: Vec<u8> = vec![
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x01, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+            0x03, 0x04, 0x05, 0x05, 0x05, 0x05, 0x05, 0x05,
+            0x06, 0x07, 0x08, 0x09, 0x09, 0x09, 0x09, 0x09,
+        ];
+
+        let mut immediate: Vec<u8> = Vec::new();
+        let mut output: Vec<u8> = Vec::new();
+        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
+        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        assert_eq!(input, output);
+    }
+
+    #[test]
+    fn test_compress_and_decompress_3() {
+        let input: Vec<u8> = vec![0x42; 4096];
+
+        let mut immediate: Vec<u8> = Vec::new();
+        let mut output: Vec<u8> = Vec::new();
+        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
+        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        assert_eq!(input, output);
     }
 }
