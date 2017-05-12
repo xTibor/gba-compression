@@ -232,6 +232,5 @@ mod tests {
         compress_wl4_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
         decompress_wl4_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
         assert_eq!(input, output);
-        println!("{:?}", immediate);
     }
 }
