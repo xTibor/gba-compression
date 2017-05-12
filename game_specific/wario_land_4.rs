@@ -1,7 +1,7 @@
 use std::io::{Read, Write, Result, Error, ErrorKind, Cursor};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use num::FromPrimitive;
-use utils::run_length;
+use utils::{consecutive_count, non_consecutive_count};
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
@@ -93,13 +93,9 @@ pub fn compress_wl4_rle8<R: Read, W: Write>(input: &mut R, output: &mut W) -> Re
     output.write_u8(StreamType::Rle8 as u8)?;
     let mut offset = 0;
     while offset < buffer.len() {
-        let length = run_length(&buffer[offset..], 0x7F);
+        let length = consecutive_count(&buffer[offset..], 0x7F);
         if length == 1 {
-            let mut length = 0;
-            while (length < 0x7F) && (offset + length < buffer.len()) &&
-                (run_length(&buffer[offset+length..], 0x7F) == 1) {
-                length += 1;
-            }
+            let length = non_consecutive_count(&buffer[offset..], 0x7F);
             output.write_u8(length as u8)?;
             output.write_all(&buffer[offset..offset+length])?;
             offset += length;
@@ -121,13 +117,9 @@ pub fn compress_wl4_rle16<R: Read, W: Write>(input: &mut R, output: &mut W) -> R
     output.write_u8(StreamType::Rle16 as u8)?;
     let mut offset = 0;
     while offset < buffer.len() {
-        let length = run_length(&buffer[offset..], 0x7FFF);
+        let length = consecutive_count(&buffer[offset..], 0x7FFF);
         if length == 1 {
-            let mut length = 0;
-            while (length < 0x7FFF) && (offset + length < buffer.len()) &&
-                (run_length(&buffer[offset+length..], 0x7FFF) == 1) {
-                length += 1;
-            }
+            let length = non_consecutive_count(&buffer[offset..], 0x7FFF);
             output.write_u16::<BigEndian>(length as u16)?;
             output.write_all(&buffer[offset..offset+length])?;
             offset += length;
