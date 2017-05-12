@@ -1,7 +1,7 @@
 use std::io::{Read, Write, Result, Error, ErrorKind, Cursor};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use num::FromPrimitive;
-use utils::{consecutive_count, non_consecutive_count};
+use compression::{consecutive_count, non_consecutive_count};
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
