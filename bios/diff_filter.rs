@@ -20,10 +20,10 @@ pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
     }
 
     let stream_type = StreamType::from_u8(header & 0xF);
-    let unfiltered_size: usize = input.read_u24::<LittleEndian>()? as usize;
+    let data_size: usize = input.read_u24::<LittleEndian>()? as usize;
 
     if stream_type == Some(StreamType::Diff8) {
-        let mut buffer: Vec<u8> = vec![0; unfiltered_size];
+        let mut buffer: Vec<u8> = vec![0; data_size];
         input.read_exact(&mut buffer)?;
 
         for i in 1..buffer.len() {
@@ -31,14 +31,14 @@ pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
             buffer[i] = data;
         }
 
-        assert_eq!(buffer.len(), unfiltered_size);
+        assert_eq!(buffer.len(), data_size);
         output.write_all(&buffer)
     } else if stream_type == Some(StreamType::Diff16) {
-        if unfiltered_size % 2 != 0 {
+        if data_size % 2 != 0 {
             return Err(Error::new(ErrorKind::InvalidData, "Output size must be a multiple of 2 for 16-bit streams"));
         }
 
-        let mut buffer: Vec<u16> = vec![0; unfiltered_size / 2];
+        let mut buffer: Vec<u16> = vec![0; data_size / 2];
         input.read_exact_u16::<LittleEndian>(&mut buffer)?;
 
         for i in 1..buffer.len() {
@@ -46,7 +46,7 @@ pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
             buffer[i] = data;
         }
 
-        assert_eq!(buffer.len(), unfiltered_size / 2);
+        assert_eq!(buffer.len(), data_size / 2);
         output.write_all_u16::<LittleEndian>(&buffer)
     } else {
         Err(Error::new(ErrorKind::InvalidData, "Unknown stream type"))
