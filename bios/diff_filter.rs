@@ -70,24 +70,17 @@ pub fn filter_diff8<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<
 
 #[allow(dead_code)]
 pub fn filter_diff16<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::new();
-    input.read_to_end(&mut buffer)?;
+    let mut buffer: Vec<u16> = Vec::new();
+    input.read_to_end_u16::<LittleEndian>(&mut buffer)?;
 
-    if buffer.len() % 2 != 0 {
-        return Err(Error::new(ErrorKind::InvalidData, "Input size must be divisible by 2"));
-    }
-
-    let mut buffer16: Vec<u16> = vec![0; buffer.len() / 2];
-    Cursor::new(buffer).read_exact_u16::<LittleEndian>(&mut buffer16)?;
-
-    for i in (1..buffer16.len()).rev() {
-        let data = buffer16[i].wrapping_sub(buffer16[i - 1]);
-        buffer16[i] = data;
+    for i in (1..buffer.len()).rev() {
+        let data = buffer[i].wrapping_sub(buffer[i - 1]);
+        buffer[i] = data;
     }
 
     output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
-    output.write_u24::<LittleEndian>(buffer16.len() as u32 * 2)?;
-    output.write_all_u16::<LittleEndian>(&buffer16)
+    output.write_u24::<LittleEndian>(buffer.len() as u32 * 2)?;
+    output.write_all_u16::<LittleEndian>(&buffer)
 }
 
 #[cfg(test)]
