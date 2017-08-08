@@ -1,5 +1,5 @@
 use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
-use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
 use utils::{ReadBytesExtExt, WriteBytesExtExt};
 use num::FromPrimitive;
@@ -13,18 +13,20 @@ enum_from_primitive! {
 }
 
 #[allow(dead_code)]
-pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    let header = input.read_u8()?;
+pub fn unfilter_diff(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    let mut cursor = Cursor::new(input);
+
+    let header = cursor.read_u8()?;
     if bios_compression_type(header) != Some(BiosCompressionType::DiffFilter) {
         return Err(Error::new(ErrorKind::InvalidData, "Not a diff filtered data stream"));
     }
 
     let stream_type = StreamType::from_u8(header & 0xF);
-    let data_size: usize = input.read_u24::<LittleEndian>()? as usize;
+    let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
 
     if stream_type == Some(StreamType::Diff8) {
         let mut buffer: Vec<u8> = vec![0; data_size];
-        input.read_exact(&mut buffer)?;
+        cursor.read_exact(&mut buffer)?;
 
         for i in 1..buffer.len() {
             let data = buffer[i - 1].wrapping_add(buffer[i]);
@@ -39,7 +41,7 @@ pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
         }
 
         let mut buffer: Vec<u16> = vec![0; data_size / 2];
-        input.read_exact_u16::<LittleEndian>(&mut buffer)?;
+        cursor.read_exact_u16::<LittleEndian>(&mut buffer)?;
 
         for i in 1..buffer.len() {
             let data = buffer[i - 1].wrapping_add(buffer[i]);
@@ -54,9 +56,8 @@ pub fn unfilter_diff<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
 }
 
 #[allow(dead_code)]
-pub fn filter_diff8<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::new();
-    input.read_to_end(&mut buffer)?;
+pub fn filter_diff8(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    let mut buffer: Vec<u8> = Vec::from(input);
 
     for i in (1..buffer.len()).rev() {
         let data = buffer[i].wrapping_sub(buffer[i - 1]);
@@ -69,9 +70,10 @@ pub fn filter_diff8<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<
 }
 
 #[allow(dead_code)]
-pub fn filter_diff16<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
+pub fn filter_diff16(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    let mut cursor = Cursor::new(input);
     let mut buffer: Vec<u16> = Vec::new();
-    input.read_to_end_u16::<LittleEndian>(&mut buffer)?;
+    cursor.read_to_end_u16::<LittleEndian>(&mut buffer)?;
 
     for i in (1..buffer.len()).rev() {
         let data = buffer[i].wrapping_sub(buffer[i - 1]);
@@ -106,7 +108,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        unfilter_diff(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        unfilter_diff(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -128,7 +130,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        unfilter_diff(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        unfilter_diff(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -146,7 +148,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -164,7 +166,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -182,7 +184,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -194,7 +196,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -209,8 +211,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -220,8 +222,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -231,8 +233,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff8(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -247,8 +249,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff16(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -258,8 +260,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff16(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -269,8 +271,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        unfilter_diff(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        filter_diff16(&input, &mut immediate).unwrap();
+        unfilter_diff(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }

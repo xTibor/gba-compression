@@ -4,12 +4,12 @@ use compression::bios::{BiosCompressionType, bios_compression_type};
 use utils::{ReadBytesExtExt, WriteBytesExtExt};
 
 #[allow(dead_code)]
-pub fn decompress_huffman<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Result<()> {
+pub fn decompress_huffman(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
     Err(Error::new(ErrorKind::Other, "Unimplemented decompression routine"))
 }
 
 #[allow(dead_code)]
-pub fn compress_huffman<R: Read, W: Write>(_input: &mut R, _output: &mut W) -> Result<()> {
+pub fn compress_huffman(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
     Err(Error::new(ErrorKind::Other, "Unimplemented compression routine"))
 }
 

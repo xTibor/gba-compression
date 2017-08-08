@@ -6,16 +6,18 @@ use compression::{consecutive_count, non_consecutive_count};
 /// Decompression routine for GBA BIOS run-length encoded data
 /// Compiles but untested
 #[allow(dead_code)]
-pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    if bios_compression_type(input.read_u8()?) != Some(BiosCompressionType::Rle) {
+pub fn decompress_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    let mut cursor = Cursor::new(input);
+
+    if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Rle) {
         return Err(Error::new(ErrorKind::InvalidData, "Not an run-length encoded stream"));
     }
 
-    let decompressed_size: usize = input.read_u24::<LittleEndian>()? as usize;
+    let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
     let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
 
     while buffer.len() < decompressed_size {
-        let block = input.read_u8()? as usize;
+        let block = cursor.read_u8()? as usize;
         if block & 0x80 == 0 {
             // Uncompressed
             let length = (block & 0x7F) + 1;
@@ -24,7 +26,7 @@ pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resul
             }
 
             for _ in 0..length {
-                buffer.push(input.read_u8()?);
+                buffer.push(cursor.read_u8()?);
             }
         } else {
             // Run-length encoded
@@ -33,7 +35,7 @@ pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resul
                 return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
             }
 
-            let data = input.read_u8()?;
+            let data = cursor.read_u8()?;
             for _ in 0..length {
                 buffer.push(data);
             }
@@ -45,24 +47,21 @@ pub fn decompress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resul
 }
 
 #[allow(dead_code)]
-pub fn compress_rle<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::new();
-    input.read_to_end(&mut buffer)?;
-
+pub fn compress_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
     output.write_u8((BiosCompressionType::Rle as u8) << 4)?;
-    output.write_u24::<LittleEndian>(buffer.len() as u32)?;
+    output.write_u24::<LittleEndian>(input.len() as u32)?;
 
     let mut offset = 0;
-    while offset < buffer.len() {
-        let length = consecutive_count(&buffer[offset..], 0x82);
+    while offset < input.len() {
+        let length = consecutive_count(&input[offset..], 0x82);
         if length < 3 {
-            let length = non_consecutive_count(&buffer[offset..], 0x80, 3);
+            let length = non_consecutive_count(&input[offset..], 0x80, 3);
             output.write_u8(length as u8 - 1)?;
-            output.write_all(&buffer[offset..offset+length])?;
+            output.write_all(&input[offset..offset+length])?;
             offset += length;
         } else {
             output.write_u8(0x80 | (length as u8 - 3))?;
-            output.write_u8(buffer[offset])?;
+            output.write_u8(input[offset])?;
             offset += length;
         }
     }
@@ -88,7 +87,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        decompress_rle(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -100,7 +99,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        assert!(decompress_rle(&mut Cursor::new(&input[..]), &mut output).is_err());
+        assert!(decompress_rle(&input, &mut output).is_err());
     }
 
     #[test]
@@ -111,7 +110,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        assert!(decompress_rle(&mut Cursor::new(&input[..]), &mut output).is_err());
+        assert!(decompress_rle(&input, &mut output).is_err());
     }
 
     #[test]
@@ -121,7 +120,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_rle(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        decompress_rle(&input, &mut output).unwrap();
         assert!(output.is_empty());
     }
 
@@ -131,8 +130,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_rle(&input, &mut immediate).unwrap();
+        decompress_rle(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -147,8 +146,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_rle(&input, &mut immediate).unwrap();
+        decompress_rle(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -158,8 +157,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_rle(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_rle(&input, &mut immediate).unwrap();
+        decompress_rle(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }

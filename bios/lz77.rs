@@ -1,4 +1,4 @@
-use std::io::{Read, Write, Result, Error, ErrorKind};
+use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
 use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
@@ -15,25 +15,27 @@ enum Block {
 
 /// Decompression routine for GBA BIOS LZ77 encoded data
 #[allow(dead_code)]
-pub fn decompress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    if bios_compression_type(input.read_u8()?) != Some(BiosCompressionType::Lz77) {
+pub fn decompress_lz77(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    let mut cursor = Cursor::new(input);
+
+    if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Lz77) {
         return Err(Error::new(ErrorKind::InvalidData, "Not an LZ77 encoded stream"));
     }
 
-    let decompressed_size: usize = input.read_u24::<LittleEndian>()? as usize;
+    let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
     let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
 
     while buffer.len() < decompressed_size {
-        let block_types = input.read_u8()?;
+        let block_types = cursor.read_u8()?;
 
         for i in 0..8 {
             if buffer.len() < decompressed_size {
                 if block_types & (0x80 >> i) == 0 {
                     // Uncompressed
-                    buffer.push(input.read_u8()?);
+                    buffer.push(cursor.read_u8()?);
                 } else {
                     // Backreference
-                    let block = input.read_u16::<LittleEndian>()? as usize;
+                    let block = cursor.read_u16::<LittleEndian>()? as usize;
                     let length = ((block >> 4) & 0xF) + 3;
                     let offset = ((block & 0xF) << 8) | ((block >> 8) & 0xFF);
 
@@ -60,21 +62,19 @@ pub fn decompress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Resu
 }
 
 #[allow(dead_code)]
-pub fn compress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::new();
-    input.read_to_end(&mut buffer)?;
-
+pub fn compress_lz77(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
     let mut blocks: Vec<Block> = Vec::new();
     let mut index = 0;
-    'outer: while index < buffer.len() {
-        let block_max_length = cmp::min(buffer.len() - index, 18);
+
+    'outer: while index < input.len() {
+        let block_max_length = cmp::min(input.len() - index, 18);
         for length in (3..block_max_length + 1).rev() {
             // TODO: Is overlapping tolerated by the BIOS decompression routine?
             // The `offset` counter has to start at `length` if not.
             let mut offset = 1;
             while (offset <= 4096) && (index >= offset) {
                 let index_back = index - offset;
-                if &buffer[index..index + length] == &buffer[index_back..index_back + length] {
+                if &input[index..index + length] == &input[index_back..index_back + length] {
                     blocks.push(Block::Backreference {
                         offset: offset as u16,
                         length: length as u8,
@@ -85,12 +85,12 @@ pub fn compress_lz77<R: Read, W: Write>(input: &mut R, output: &mut W) -> Result
                 offset += 1;
             }
         }
-        blocks.push(Block::Uncompressed { data: buffer[index] });
+        blocks.push(Block::Uncompressed { data: input[index] });
         index += 1;
     }
 
     output.write_u8((BiosCompressionType::Lz77 as u8) << 4)?;
-    output.write_u24::<LittleEndian>(buffer.len() as u32)?;
+    output.write_u24::<LittleEndian>(input.len() as u32)?;
 
     for chunk in blocks.chunks(8) {
         let mut block_types = 0;
@@ -144,7 +144,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_lz77(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        decompress_lz77(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -155,7 +155,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_lz77(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        decompress_lz77(&input, &mut output).unwrap();
         assert!(output.is_empty());
     }
 
@@ -167,7 +167,7 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        compress_lz77(&mut Cursor::new(&input[..]), &mut output).unwrap();
+        compress_lz77(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -177,8 +177,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_lz77(&input, &mut immediate).unwrap();
+        decompress_lz77(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -193,8 +193,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_lz77(&input, &mut immediate).unwrap();
+        decompress_lz77(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -204,8 +204,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_lz77(&input, &mut immediate).unwrap();
+        decompress_lz77(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -219,8 +219,8 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_lz77(&mut Cursor::new(&input[..]), &mut immediate).unwrap();
-        decompress_lz77(&mut Cursor::new(&immediate[..]), &mut output).unwrap();
+        compress_lz77(&input, &mut immediate).unwrap();
+        decompress_lz77(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }
