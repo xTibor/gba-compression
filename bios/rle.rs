@@ -70,8 +70,6 @@ impl Compressor for RleCompressor {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use compression::Compressor;

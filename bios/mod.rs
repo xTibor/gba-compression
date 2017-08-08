@@ -3,7 +3,7 @@ mod huffman;
 mod lz77;
 mod rle;
 
-pub use self::diff_filter::{unfilter_diff, filter_diff8, filter_diff16};
+pub use self::diff_filter::{Diff8Filter, Diff16Filter};
 pub use self::huffman::HuffmanCompressor;
 pub use self::lz77::Lz77Compressor;
 pub use self::rle::RleCompressor;

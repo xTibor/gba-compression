@@ -1,8 +1,15 @@
 use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
+use compression::Compressor;
 use utils::{ReadBytesExtExt, WriteBytesExtExt};
 use num::FromPrimitive;
+
+#[derive(Default)]
+pub struct Diff8Filter;
+
+#[derive(Default)]
+pub struct Diff16Filter;
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
@@ -12,19 +19,31 @@ enum_from_primitive! {
     }
 }
 
-#[allow(dead_code)]
-pub fn unfilter_diff(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut cursor = Cursor::new(input);
+impl Compressor for Diff8Filter {
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut buffer: Vec<u8> = Vec::from(input);
 
-    let header = cursor.read_u8()?;
-    if bios_compression_type(header) != Some(BiosCompressionType::DiffFilter) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not a diff filtered data stream"));
+        for i in (1..buffer.len()).rev() {
+            let data = buffer[i].wrapping_sub(buffer[i - 1]);
+            buffer[i] = data;
+        }
+
+        output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff8 as u8))?;
+        output.write_u24::<LittleEndian>(buffer.len() as u32)?;
+        output.write_all(&buffer)
     }
 
-    let stream_type = StreamType::from_u8(header & 0xF);
-    let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+        let header = cursor.read_u8()?;
 
-    if stream_type == Some(StreamType::Diff8) {
+        if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
+            (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff8)) {
+            return Err(Error::new(ErrorKind::InvalidData, "Not a Diff8 stream"));
+        }
+
+        let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
+
         let mut buffer: Vec<u8> = vec![0; data_size];
         cursor.read_exact(&mut buffer)?;
 
@@ -35,9 +54,37 @@ pub fn unfilter_diff(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
 
         assert_eq!(buffer.len(), data_size);
         output.write_all(&buffer)
-    } else if stream_type == Some(StreamType::Diff16) {
+    }
+}
+
+impl Compressor for Diff16Filter {
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+        let mut buffer: Vec<u16> = Vec::new();
+        cursor.read_to_end_u16::<LittleEndian>(&mut buffer)?;
+
+        for i in (1..buffer.len()).rev() {
+            let data = buffer[i].wrapping_sub(buffer[i - 1]);
+            buffer[i] = data;
+        }
+
+        output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
+        output.write_u24::<LittleEndian>(buffer.len() as u32 * 2)?;
+        output.write_all_u16::<LittleEndian>(&buffer)
+    }
+
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+        let header = cursor.read_u8()?;
+
+        if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
+            (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff16)) {
+            return Err(Error::new(ErrorKind::InvalidData, "Not a Diff16 stream"));
+        }
+
+        let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
         if data_size % 2 != 0 {
-            return Err(Error::new(ErrorKind::InvalidData, "Output size must be a multiple of 2 for 16-bit streams"));
+            return Err(Error::new(ErrorKind::InvalidData, "Size must be a multiple of 2 for Diff16 streams"));
         }
 
         let mut buffer: Vec<u16> = vec![0; data_size / 2];
@@ -50,44 +97,13 @@ pub fn unfilter_diff(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
 
         assert_eq!(buffer.len(), data_size / 2);
         output.write_all_u16::<LittleEndian>(&buffer)
-    } else {
-        Err(Error::new(ErrorKind::InvalidData, "Unknown stream type"))
     }
-}
-
-#[allow(dead_code)]
-pub fn filter_diff8(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut buffer: Vec<u8> = Vec::from(input);
-
-    for i in (1..buffer.len()).rev() {
-        let data = buffer[i].wrapping_sub(buffer[i - 1]);
-        buffer[i] = data;
-    }
-
-    output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff8 as u8))?;
-    output.write_u24::<LittleEndian>(buffer.len() as u32)?;
-    output.write_all(&buffer)
-}
-
-#[allow(dead_code)]
-pub fn filter_diff16(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut cursor = Cursor::new(input);
-    let mut buffer: Vec<u16> = Vec::new();
-    cursor.read_to_end_u16::<LittleEndian>(&mut buffer)?;
-
-    for i in (1..buffer.len()).rev() {
-        let data = buffer[i].wrapping_sub(buffer[i - 1]);
-        buffer[i] = data;
-    }
-
-    output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
-    output.write_u24::<LittleEndian>(buffer.len() as u32 * 2)?;
-    output.write_all_u16::<LittleEndian>(&buffer)
 }
 
 #[cfg(test)]
 mod tests {
-    use compression::bios::{unfilter_diff, filter_diff8, filter_diff16};
+    use compression::Compressor;
+    use compression::bios::{Diff8Filter, Diff16Filter};
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
@@ -108,7 +124,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        unfilter_diff(&input, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -130,7 +148,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        unfilter_diff(&input, &mut output).unwrap();
+        let compressor = Diff16Filter::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -148,7 +168,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -166,7 +188,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -184,7 +208,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -196,7 +222,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -211,8 +239,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -222,8 +252,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -233,8 +265,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff8(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff8Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -249,8 +283,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff16Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -260,8 +296,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff16Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -271,8 +309,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        filter_diff16(&input, &mut immediate).unwrap();
-        unfilter_diff(&immediate, &mut output).unwrap();
+        let compressor = Diff16Filter::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }
