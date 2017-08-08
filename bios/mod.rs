@@ -4,9 +4,9 @@ mod lz77;
 mod rle;
 
 pub use self::diff_filter::{unfilter_diff, filter_diff8, filter_diff16};
-pub use self::huffman::{decompress_huffman, compress_huffman};
+pub use self::huffman::HuffmanCompressor;
 pub use self::lz77::Lz77Compressor;
-pub use self::rle::{decompress_rle, compress_rle};
+pub use self::rle::RleCompressor;
 
 use num::FromPrimitive;
 

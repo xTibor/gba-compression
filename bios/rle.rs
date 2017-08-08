@@ -1,77 +1,81 @@
 use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
-use compression::{consecutive_count, non_consecutive_count};
+use compression::{Compressor, consecutive_count, non_consecutive_count};
 
-/// Decompression routine for GBA BIOS run-length encoded data
-/// Compiles but untested
-#[allow(dead_code)]
-pub fn decompress_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut cursor = Cursor::new(input);
+#[derive(Default)]
+pub struct RleCompressor;
 
-    if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Rle) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not an run-length encoded stream"));
-    }
+impl Compressor for RleCompressor {
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
 
-    let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
-    let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
+        if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Rle) {
+            return Err(Error::new(ErrorKind::InvalidData, "Not an run-length encoded stream"));
+        }
 
-    while buffer.len() < decompressed_size {
-        let block = cursor.read_u8()? as usize;
-        if block & 0x80 == 0 {
-            // Uncompressed
-            let length = (block & 0x7F) + 1;
-            if buffer.len() + length > decompressed_size {
-                return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
-            }
+        let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
+        let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
 
-            for _ in 0..length {
-                buffer.push(cursor.read_u8()?);
-            }
-        } else {
-            // Run-length encoded
-            let length = (block & 0x7F) + 3;
-            if buffer.len() + length > decompressed_size {
-                return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
-            }
+        while buffer.len() < decompressed_size {
+            let block = cursor.read_u8()? as usize;
+            if block & 0x80 == 0 {
+                // Uncompressed
+                let length = (block & 0x7F) + 1;
+                if buffer.len() + length > decompressed_size {
+                    return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
+                }
 
-            let data = cursor.read_u8()?;
-            for _ in 0..length {
-                buffer.push(data);
+                for _ in 0..length {
+                    buffer.push(cursor.read_u8()?);
+                }
+            } else {
+                // Run-length encoded
+                let length = (block & 0x7F) + 3;
+                if buffer.len() + length > decompressed_size {
+                    return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
+                }
+
+                let data = cursor.read_u8()?;
+                for _ in 0..length {
+                    buffer.push(data);
+                }
             }
         }
+
+        assert_eq!(buffer.len(), decompressed_size);
+        output.write_all(&buffer)
     }
 
-    assert_eq!(buffer.len(), decompressed_size);
-    output.write_all(&buffer)
-}
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        output.write_u8((BiosCompressionType::Rle as u8) << 4)?;
+        output.write_u24::<LittleEndian>(input.len() as u32)?;
 
-#[allow(dead_code)]
-pub fn compress_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    output.write_u8((BiosCompressionType::Rle as u8) << 4)?;
-    output.write_u24::<LittleEndian>(input.len() as u32)?;
-
-    let mut offset = 0;
-    while offset < input.len() {
-        let length = consecutive_count(&input[offset..], 0x82);
-        if length < 3 {
-            let length = non_consecutive_count(&input[offset..], 0x80, 3);
-            output.write_u8(length as u8 - 1)?;
-            output.write_all(&input[offset..offset+length])?;
-            offset += length;
-        } else {
-            output.write_u8(0x80 | (length as u8 - 3))?;
-            output.write_u8(input[offset])?;
-            offset += length;
+        let mut offset = 0;
+        while offset < input.len() {
+            let length = consecutive_count(&input[offset..], 0x82);
+            if length < 3 {
+                let length = non_consecutive_count(&input[offset..], 0x80, 3);
+                output.write_u8(length as u8 - 1)?;
+                output.write_all(&input[offset..offset+length])?;
+                offset += length;
+            } else {
+                output.write_u8(0x80 | (length as u8 - 3))?;
+                output.write_u8(input[offset])?;
+                offset += length;
+            }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
+
+
 
 #[cfg(test)]
 mod tests {
-    use compression::bios::{decompress_rle, compress_rle};
+    use compression::Compressor;
+    use compression::bios::RleCompressor;
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
@@ -87,7 +91,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_rle(&input, &mut output).unwrap();
+        let compressor = RleCompressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -99,7 +105,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        assert!(decompress_rle(&input, &mut output).is_err());
+        let compressor = RleCompressor::default();
+
+        assert!(compressor.decompress(&input, &mut output).is_err());
     }
 
     #[test]
@@ -110,7 +118,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        assert!(decompress_rle(&input, &mut output).is_err());
+        let compressor = RleCompressor::default();
+
+        assert!(compressor.decompress(&input, &mut output).is_err());
     }
 
     #[test]
@@ -120,7 +130,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_rle(&input, &mut output).unwrap();
+        let compressor = RleCompressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert!(output.is_empty());
     }
 
@@ -130,8 +142,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&input, &mut immediate).unwrap();
-        decompress_rle(&immediate, &mut output).unwrap();
+        let compressor = RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -146,8 +160,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&input, &mut immediate).unwrap();
-        decompress_rle(&immediate, &mut output).unwrap();
+        let compressor = RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -157,8 +173,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_rle(&input, &mut immediate).unwrap();
-        decompress_rle(&immediate, &mut output).unwrap();
+        let compressor = RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }
