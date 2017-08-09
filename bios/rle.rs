@@ -1,4 +1,4 @@
-use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
+use std::io::{Write, Cursor, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compression::bios::{BiosCompressionType, bios_compression_type};
 use compression::{Compressor, consecutive_count, non_consecutive_count};

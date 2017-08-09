@@ -76,7 +76,7 @@ impl Compressor for Lz77Compressor {
                 let mut offset = 1;
                 while (offset <= 4096) && (index >= offset) {
                     let index_back = index - offset;
-                    if &input[index..index + length] == &input[index_back..index_back + length] {
+                    if input[index..index + length] == input[index_back..index_back + length] {
                         blocks.push(Block::Backreference {
                             offset: offset as u16,
                             length: length as u8,

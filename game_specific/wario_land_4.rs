@@ -138,8 +138,8 @@ impl Compressor for Wl4RleCompressor {
         let mut output_rle8: Vec<u8> = Vec::new();
         let mut output_rle16: Vec<u8> = Vec::new();
 
-        self.rle8_compressor.compress(&input, &mut output_rle8)?;
-        self.rle16_compressor.compress(&input, &mut output_rle16)?;
+        self.rle8_compressor.compress(input, &mut output_rle8)?;
+        self.rle16_compressor.compress(input, &mut output_rle16)?;
 
         if output_rle8.len() < output_rle16.len() {
             output.write_all(&output_rle8)
