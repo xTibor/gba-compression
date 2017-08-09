@@ -1,7 +1,7 @@
-use std::io::{Read, Write, Result, Error, ErrorKind, Cursor};
+use std::io::{Write, Result, Error, ErrorKind, Cursor};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use num::FromPrimitive;
-use compression::{consecutive_count, non_consecutive_count};
+use compression::{Compressor, consecutive_count, non_consecutive_count};
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
@@ -11,126 +11,159 @@ enum_from_primitive! {
     }
 }
 
-/// Decompression routine for Wario Land 4 run-length encoded data
-/// Operates on 8-bit data but run-lengths can be 8 or 16-bit.
-/// Based on my old FPC/Lazarus code.
-#[allow(dead_code)]
-pub fn decompress_wl4_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut cursor = Cursor::new(input);
+#[derive(Default)]
+pub struct Wl4Rle8Compressor;
 
-    let stream_type = StreamType::from_u8(cursor.read_u8()?);
-    if stream_type == Some(StreamType::Rle8) {
-        loop {
-            let block = cursor.read_u8()?;
-            if block == 0 {
-                // End of stream
-                break;
-            } else if block & 0x80 == 0 {
-                // Uncompressed
-                let length = block & 0x7F;
-                for _ in 0..length {
-                    output.push(cursor.read_u8()?);
-                }
+#[derive(Default)]
+pub struct Wl4Rle16Compressor;
+
+#[derive(Default)]
+pub struct Wl4RleCompressor {
+    rle8_compressor: Wl4Rle8Compressor,
+    rle16_compressor: Wl4Rle16Compressor,
+}
+
+impl Compressor for Wl4Rle8Compressor {
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        output.write_u8(StreamType::Rle8 as u8)?;
+
+        let mut offset = 0;
+        while offset < input.len() {
+            let length = consecutive_count(&input[offset..], 0x7F);
+            if length == 1 {
+                let length = non_consecutive_count(&input[offset..], 0x7F, 2);
+                output.write_u8(length as u8)?;
+                output.write_all(&input[offset..offset+length])?;
+                offset += length;
             } else {
-                // Run-length encoded
-                let length = block & 0x7F;
-                let data = cursor.read_u8()?;
-                for _ in 0..length {
-                    output.push(data);
-                }
+                output.write_u8(0x80 | length as u8)?;
+                output.write_u8(input[offset])?;
+                offset += length;
             }
         }
-    } else if stream_type == Some(StreamType::Rle16) {
-        loop {
-            let block = cursor.read_u16::<BigEndian>()?;
-            if block == 0 {
-                // End of stream
-                break;
-            } else if block & 0x8000 == 0 {
-                // Uncompressed
-                let length = block & 0x7FFF;
-                for _ in 0..length {
-                    output.push(cursor.read_u8()?);
-                }
-            } else {
-                // Run-length encoded
-                let length = block & 0x7FFF;
-                let data = cursor.read_u8()?;
-                for _ in 0..length {
-                    output.push(data);
+
+        output.write_u8(0)
+    }
+
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+
+        let stream_type = StreamType::from_u8(cursor.read_u8()?);
+        if stream_type == Some(StreamType::Rle8) {
+            loop {
+                let block = cursor.read_u8()?;
+                if block == 0 {
+                    // End of stream
+                    break;
+                } else if block & 0x80 == 0 {
+                    // Uncompressed
+                    let length = block & 0x7F;
+                    for _ in 0..length {
+                        output.push(cursor.read_u8()?);
+                    }
+                } else {
+                    // Run-length encoded
+                    let length = block & 0x7F;
+                    let data = cursor.read_u8()?;
+                    for _ in 0..length {
+                        output.push(data);
+                    }
                 }
             }
-        }
-    } else {
-        return Err(Error::new(ErrorKind::InvalidData, "Unknown stream type"));
-    }
 
-    Ok(())
-}
-
-// TODO: Extract this stream comparison function to the parent module
-#[allow(dead_code)]
-pub fn compress_wl4_rle(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    let mut buffer_rle8: Vec<u8> = Vec::new();
-    let mut buffer_rle16: Vec<u8> = Vec::new();
-
-    compress_wl4_rle8(&input, &mut buffer_rle8)?;
-    compress_wl4_rle16(&input, &mut buffer_rle16)?;
-
-    if buffer_rle8.len() < buffer_rle16.len() {
-        output.write_all(&buffer_rle8)
-    } else {
-        output.write_all(&buffer_rle16)
-    }
-}
-
-#[allow(dead_code)]
-pub fn compress_wl4_rle8(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    output.write_u8(StreamType::Rle8 as u8)?;
-
-    let mut offset = 0;
-    while offset < input.len() {
-        let length = consecutive_count(&input[offset..], 0x7F);
-        if length == 1 {
-            let length = non_consecutive_count(&input[offset..], 0x7F, 2);
-            output.write_u8(length as u8)?;
-            output.write_all(&input[offset..offset+length])?;
-            offset += length;
+            Ok(())
         } else {
-            output.write_u8(0x80 | length as u8)?;
-            output.write_u8(input[offset])?;
-            offset += length;
+            Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle8 stream"))
         }
     }
-
-    output.write_u8(0)
 }
 
-#[allow(dead_code)]
-pub fn compress_wl4_rle16(input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-    output.write_u8(StreamType::Rle16 as u8)?;
+impl Compressor for Wl4Rle16Compressor {
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        output.write_u8(StreamType::Rle16 as u8)?;
 
-    let mut offset = 0;
-    while offset < input.len() {
-        let length = consecutive_count(&input[offset..], 0x7FFF);
-        if length == 1 {
-            let length = non_consecutive_count(&input[offset..], 0x7FFF, 2);
-            output.write_u16::<BigEndian>(length as u16)?;
-            output.write_all(&input[offset..offset+length])?;
-            offset += length;
+        let mut offset = 0;
+        while offset < input.len() {
+            let length = consecutive_count(&input[offset..], 0x7FFF);
+            if length == 1 {
+                let length = non_consecutive_count(&input[offset..], 0x7FFF, 2);
+                output.write_u16::<BigEndian>(length as u16)?;
+                output.write_all(&input[offset..offset+length])?;
+                offset += length;
+            } else {
+                output.write_u16::<BigEndian>(0x8000 | length as u16)?;
+                output.write_u8(input[offset])?;
+                offset += length;
+            }
+        }
+
+        output.write_u16::<BigEndian>(0)
+    }
+
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+
+        let stream_type = StreamType::from_u8(cursor.read_u8()?);
+        if stream_type == Some(StreamType::Rle16) {
+            loop {
+                let block = cursor.read_u16::<BigEndian>()?;
+                if block == 0 {
+                    // End of stream
+                    break;
+                } else if block & 0x8000 == 0 {
+                    // Uncompressed
+                    let length = block & 0x7FFF;
+                    for _ in 0..length {
+                        output.push(cursor.read_u8()?);
+                    }
+                } else {
+                    // Run-length encoded
+                    let length = block & 0x7FFF;
+                    let data = cursor.read_u8()?;
+                    for _ in 0..length {
+                        output.push(data);
+                    }
+                }
+            }
+
+            Ok(())
         } else {
-            output.write_u16::<BigEndian>(0x8000 | length as u16)?;
-            output.write_u8(input[offset])?;
-            offset += length;
+            Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle16 stream"))
+        }
+    }
+}
+
+impl Compressor for Wl4RleCompressor {
+    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut output_rle8: Vec<u8> = Vec::new();
+        let mut output_rle16: Vec<u8> = Vec::new();
+
+        self.rle8_compressor.compress(&input, &mut output_rle8)?;
+        self.rle16_compressor.compress(&input, &mut output_rle16)?;
+
+        if output_rle8.len() < output_rle16.len() {
+            output.write_all(&output_rle8)
+        } else {
+            output.write_all(&output_rle16)
         }
     }
 
-    output.write_u16::<BigEndian>(0)
+    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+        let mut cursor = Cursor::new(input);
+        let stream_type = StreamType::from_u8(cursor.read_u8()?);
+
+        match stream_type {
+            Some(StreamType::Rle8) => self.rle8_compressor.decompress(input, output),
+            Some(StreamType::Rle16) => self.rle16_compressor.decompress(input, output),
+            None => Err(Error::new(ErrorKind::InvalidData, "Unknown WL4 stream type")),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use compression::game_specific::wario_land_4::{decompress_wl4_rle, compress_wl4_rle};
+    use compression::Compressor;
+    use compression::game_specific::wario_land_4::{Wl4RleCompressor, Wl4Rle8Compressor, Wl4Rle16Compressor};
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
@@ -147,7 +180,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_wl4_rle(&input, &mut output).unwrap();
+        let compressor = Wl4Rle8Compressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -165,7 +200,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_wl4_rle(&input, &mut output).unwrap();
+        let compressor = Wl4Rle16Compressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert_eq!(output, expected_output);
     }
 
@@ -176,7 +213,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_wl4_rle(&input, &mut output).unwrap();
+        let compressor = Wl4Rle8Compressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert!(output.is_empty());
     }
 
@@ -187,7 +226,9 @@ mod tests {
         ];
 
         let mut output: Vec<u8> = Vec::new();
-        decompress_wl4_rle(&input, &mut output).unwrap();
+        let compressor = Wl4Rle16Compressor::default();
+
+        compressor.decompress(&input, &mut output).unwrap();
         assert!(output.is_empty());
     }
 
@@ -197,8 +238,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_wl4_rle(&input, &mut immediate).unwrap();
-        decompress_wl4_rle(&immediate, &mut output).unwrap();
+        let compressor = Wl4RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -213,8 +256,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_wl4_rle(&input, &mut immediate).unwrap();
-        decompress_wl4_rle(&immediate, &mut output).unwrap();
+        let compressor = Wl4RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 
@@ -224,8 +269,10 @@ mod tests {
 
         let mut immediate: Vec<u8> = Vec::new();
         let mut output: Vec<u8> = Vec::new();
-        compress_wl4_rle(&input, &mut immediate).unwrap();
-        decompress_wl4_rle(&immediate, &mut output).unwrap();
+        let compressor = Wl4RleCompressor::default();
+
+        compressor.compress(&input, &mut immediate).unwrap();
+        compressor.decompress(&immediate, &mut output).unwrap();
         assert_eq!(input, output);
     }
 }
