@@ -2,7 +2,6 @@ use std::io::{Read, Write, Result, Error, ErrorKind};
 use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt};
 use compression::Compressor;
 use compression::bios::{BiosCompressionType, bios_compression_type};
-use utils::{ReadBytesExtExt, WriteBytesExtExt};
 
 #[derive(Default)]
 pub struct HuffmanCompressor;
