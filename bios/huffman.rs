@@ -60,17 +60,34 @@ impl Compressor for HuffmanCompressor {
             read_node(&tree_data, 0, false)?
         };
 
-        println!("cursor.position: {:08X}", cursor.position());
-        println!("huffman_tree: {:#?}", huffman_tree);
+        let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
+        let mut bits = cursor.read_u32::<LittleEndian>()?;
+        let mut remaining_bits = 32;
+        let mut current_node = &huffman_tree;
 
-        let buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
-        /*
         while buffer.len() < decompressed_size {
-            let x = cursor.read_u32::<LittleEndian>()?;
+            if let &HuffmanNode::Branch { ref node0, ref node1 } = current_node {
+                current_node = if bits & 0x80000000 == 0 { node0 } else { node1 };
 
-        }*/
+                if let &HuffmanNode::Leaf { value } = current_node {
+                    buffer.push(value);
+                    current_node = &huffman_tree;
+                }
 
-        Ok(())
+                bits <<= 1;
+                remaining_bits -= 1;
+
+                if (remaining_bits == 0) && (buffer.len() < decompressed_size) {
+                    bits = cursor.read_u32::<LittleEndian>()?;
+                    remaining_bits = 32;
+                }
+            } else {
+                unreachable!();
+            };
+        }
+
+        assert_eq!(buffer.len(), decompressed_size);
+        output.write_all(&buffer)
     }
 
     fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
