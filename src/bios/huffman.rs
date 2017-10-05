@@ -1,7 +1,5 @@
-#![allow(unused_imports, unused_variables)]
-
 use std::io::{Cursor, Read, Write, Result, Error, ErrorKind};
-use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt};
 use compressor::Compressor;
 use bios::{BiosCompressionType, bios_compression_type};
 
@@ -98,7 +96,6 @@ impl Compressor for HuffmanCompressor {
 #[cfg(test)]
 mod tests {
     use bios::HuffmanCompressor;
-    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
     fn test_decompress_1() {

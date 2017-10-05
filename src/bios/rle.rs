@@ -75,7 +75,6 @@ impl Compressor for RleCompressor {
 mod tests {
     use compressor::Compressor;
     use bios::RleCompressor;
-    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
     fn test_decompress_1() {

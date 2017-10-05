@@ -121,7 +121,6 @@ impl Compressor for Diff16Filter {
 mod tests {
     use compressor::Compressor;
     use bios::{Diff8Filter, Diff16Filter};
-    use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
     fn test_unfilter_1() {

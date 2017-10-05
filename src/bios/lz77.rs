@@ -135,7 +135,6 @@ impl Compressor for Lz77Compressor {
 mod tests {
     use compressor::Compressor;
     use bios::Lz77Compressor;
-    use std::io::{Cursor, Seek, SeekFrom};
 
     // TODO: Add tests for out of bounds cases
 
