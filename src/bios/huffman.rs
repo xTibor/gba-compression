@@ -2,7 +2,7 @@
 
 use std::io::{Cursor, Read, Write, Result, Error, ErrorKind};
 use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt};
-use Compressor;
+use compressor::Compressor;
 use bios::{BiosCompressionType, bios_compression_type};
 
 #[derive(Default)]

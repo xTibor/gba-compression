@@ -1,7 +1,7 @@
 use std::io::{Write, Cursor, Result, Error, ErrorKind};
 use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use Compressor;
+use compressor::Compressor;
 use bios::{BiosCompressionType, bios_compression_type};
 
 #[derive(Default)]
@@ -133,7 +133,7 @@ impl Compressor for Lz77Compressor {
 
 #[cfg(test)]
 mod tests {
-    use Compressor;
+    use compressor::Compressor;
     use bios::Lz77Compressor;
     use std::io::{Cursor, Seek, SeekFrom};
 
