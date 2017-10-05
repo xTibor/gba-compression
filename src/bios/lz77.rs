@@ -1,8 +1,8 @@
 use std::io::{Write, Cursor, Result, Error, ErrorKind};
 use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use compression::Compressor;
-use compression::bios::{BiosCompressionType, bios_compression_type};
+use Compressor;
+use bios::{BiosCompressionType, bios_compression_type};
 
 #[derive(Default)]
 pub struct Lz77Compressor {
@@ -133,8 +133,8 @@ impl Compressor for Lz77Compressor {
 
 #[cfg(test)]
 mod tests {
-    use compression::Compressor;
-    use compression::bios::Lz77Compressor;
+    use Compressor;
+    use bios::Lz77Compressor;
     use std::io::{Cursor, Seek, SeekFrom};
 
     // TODO: Add tests for out of bounds cases

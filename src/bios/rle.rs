@@ -1,7 +1,7 @@
 use std::io::{Write, Cursor, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use compression::bios::{BiosCompressionType, bios_compression_type};
-use compression::{Compressor, consecutive_count, non_consecutive_count};
+use bios::{BiosCompressionType, bios_compression_type};
+use {Compressor, consecutive_count, non_consecutive_count};
 
 #[derive(Default)]
 pub struct RleCompressor;
@@ -72,8 +72,8 @@ impl Compressor for RleCompressor {
 
 #[cfg(test)]
 mod tests {
-    use compression::Compressor;
-    use compression::bios::RleCompressor;
+    use Compressor;
+    use bios::RleCompressor;
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]

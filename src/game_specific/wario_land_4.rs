@@ -1,7 +1,7 @@
 use std::io::{Write, Result, Error, ErrorKind, Cursor};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use num::FromPrimitive;
-use compression::{Compressor, consecutive_count, non_consecutive_count};
+use {Compressor, consecutive_count, non_consecutive_count};
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
@@ -162,8 +162,8 @@ impl Compressor for Wl4RleCompressor {
 
 #[cfg(test)]
 mod tests {
-    use compression::Compressor;
-    use compression::game_specific::wario_land_4::{Wl4RleCompressor, Wl4Rle8Compressor, Wl4Rle16Compressor};
+    use Compressor;
+    use game_specific::wario_land_4::{Wl4RleCompressor, Wl4Rle8Compressor, Wl4Rle16Compressor};
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]

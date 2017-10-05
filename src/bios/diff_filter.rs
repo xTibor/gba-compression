@@ -1,7 +1,7 @@
 use std::io::{Read, Write, Cursor, Result, Error, ErrorKind};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
-use compression::bios::{BiosCompressionType, bios_compression_type};
-use compression::Compressor;
+use bios::{BiosCompressionType, bios_compression_type};
+use Compressor;
 use num::FromPrimitive;
 
 #[derive(Default)]
@@ -119,8 +119,8 @@ impl Compressor for Diff16Filter {
 
 #[cfg(test)]
 mod tests {
-    use compression::Compressor;
-    use compression::bios::{Diff8Filter, Diff16Filter};
+    use Compressor;
+    use bios::{Diff8Filter, Diff16Filter};
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]

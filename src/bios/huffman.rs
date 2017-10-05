@@ -2,8 +2,8 @@
 
 use std::io::{Cursor, Read, Write, Result, Error, ErrorKind};
 use byteorder::{ByteOrder, BigEndian, LittleEndian, ReadBytesExt};
-use compression::Compressor;
-use compression::bios::{BiosCompressionType, bios_compression_type};
+use Compressor;
+use bios::{BiosCompressionType, bios_compression_type};
 
 #[derive(Default)]
 pub struct HuffmanCompressor;
@@ -97,7 +97,7 @@ impl Compressor for HuffmanCompressor {
 
 #[cfg(test)]
 mod tests {
-    use compression::bios::HuffmanCompressor;
+    use bios::HuffmanCompressor;
     use std::io::{Cursor, Seek, SeekFrom};
 
     #[test]
