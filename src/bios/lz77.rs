@@ -97,7 +97,6 @@ impl Compressor for Lz77Compressor {
                     }
                 }
 
-                // TODO: Step more than just 1 byte
                 current_offset -= 1;
             }
 
