@@ -3,6 +3,7 @@ use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compressor::Compressor;
 use bios::{BiosCompressionType, bios_compression_type};
+use utils::same_count;
 
 #[derive(Default)]
 pub struct Lz77Compressor {
@@ -70,29 +71,46 @@ impl Compressor for Lz77Compressor {
         let mut blocks: Vec<Block> = Vec::new();
         let mut index = 0;
 
-        'outer: while index < input.len() {
-            let block_max_length = cmp::min(input.len() - index, 18);
-            for length in (3..block_max_length + 1).rev() {
-                // When decompressing to VRAM the previous byte cannot be referenced in
-                // the uncompressed data because it may have not written to the memory yet.
-                // The data to the VRAM is written in 16-bit words due to 16-bit data bus.
-                let mut offset = if self.vram_safe { 2 } else { 1 };
+        while index < input.len() {
+            // When decompressing to VRAM the previous byte cannot be referenced in
+            // the uncompressed data because it may have not written to the memory yet.
+            // The data to the VRAM is written in 16-bit words due to 16-bit data bus.
+            let min_offset = if self.vram_safe { 2 } else { 1 };
+            let max_offset = cmp::min(index, 4096);
 
-                while (offset <= 4096) && (index >= offset) {
-                    let index_back = index - offset;
-                    if input[index..index + length] == input[index_back..index_back + length] {
-                        blocks.push(Block::Backreference {
-                            offset: offset as u16,
-                            length: length as u8,
-                        });
-                        index += length;
-                        continue 'outer;
+            let min_length = 3;
+            let max_length = cmp::min(input.len() - index, 18);
+
+            let mut best_reference: Option<(usize, usize)> = None;
+            let mut current_offset = max_offset;
+
+            while current_offset >= min_offset {
+                let current_length = same_count(&input[index..], &input[index - current_offset..], max_length);
+
+                if current_length >= min_length {
+                    if let Some((_, best_length)) = best_reference {
+                        if current_length > best_length {
+                            best_reference = Some((current_offset, current_length));
+                        }
+                    } else {
+                        best_reference = Some((current_offset, current_length));
                     }
-                    offset += 1;
                 }
+
+                // TODO: Step more than just 1 byte
+                current_offset -= 1;
             }
-            blocks.push(Block::Uncompressed { data: input[index] });
-            index += 1;
+
+            if let Some((best_offset, best_length)) = best_reference {
+                blocks.push(Block::Backreference {
+                    offset: best_offset as u16,
+                    length: best_length as u8,
+                });
+                index += best_length;
+            } else {
+                blocks.push(Block::Uncompressed { data: input[index] });
+                index += 1;
+            }
         }
 
         output.write_u8((BiosCompressionType::Lz77 as u8) << 4)?;
