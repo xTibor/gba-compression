@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 mod diff_filter;
 mod huffman;
 mod lz77;
