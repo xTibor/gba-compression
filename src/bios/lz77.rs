@@ -1,4 +1,4 @@
-use std::io::{Write, Cursor, Result, Error, ErrorKind};
+use std::io::{Cursor, Result, Error, ErrorKind};
 use std::cmp;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use compressor::Compressor;
@@ -11,7 +11,7 @@ pub struct Lz77Compressor {
 }
 
 impl Compressor for Lz77Compressor {
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
 
         if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Lz77) {
@@ -19,45 +19,45 @@ impl Compressor for Lz77Compressor {
         }
 
         let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
-        let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
+        let mut output = Vec::with_capacity(decompressed_size);
 
-        while buffer.len() < decompressed_size {
+        while output.len() < decompressed_size {
             let block_types = cursor.read_u8()?;
 
             for i in 0..8 {
-                if buffer.len() < decompressed_size {
+                if output.len() < decompressed_size {
                     if block_types & (0x80 >> i) == 0 {
                         // Uncompressed
-                        buffer.push(cursor.read_u8()?);
+                        output.push(cursor.read_u8()?);
                     } else {
                         // Backreference
                         let block = cursor.read_u16::<LittleEndian>()? as usize;
                         let length = ((block >> 4) & 0xF) + 3;
                         let offset = (((block & 0xF) << 8) | ((block >> 8) & 0xFF)) + 1;
 
-                        if buffer.len() + length > decompressed_size {
+                        if output.len() + length > decompressed_size {
                             return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
                         }
 
-                        if offset > buffer.len() {
+                        if offset > output.len() {
                             return Err(Error::new(ErrorKind::InvalidData, "Offset out of bounds"));
                         }
 
                         for _ in 0..length {
-                            let index = buffer.len() - offset;
-                            let byte = buffer[index];
-                            buffer.push(byte);
+                            let index = output.len() - offset;
+                            let byte = output[index];
+                            output.push(byte);
                         }
                     }
                 }
             }
         }
 
-        assert_eq!(buffer.len(), decompressed_size);
-        output.write_all(&buffer)
+        assert_eq!(output.len(), decompressed_size);
+        Ok(output)
     }
 
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
         enum Block {
             Uncompressed {
                 data: u8,
@@ -109,6 +109,7 @@ impl Compressor for Lz77Compressor {
             }
         }
 
+        let mut output = Vec::new();
         output.write_u8((BiosCompressionType::Lz77 as u8) << 4)?;
         output.write_u24::<LittleEndian>(input.len() as u32)?;
 
@@ -141,6 +142,6 @@ impl Compressor for Lz77Compressor {
             }
         }
 
-        Ok(())
+        Ok(output)
     }
 }

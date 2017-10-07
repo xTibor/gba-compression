@@ -19,7 +19,7 @@ enum_from_primitive! {
 }
 
 impl Compressor for Diff8Filter {
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut buffer: Vec<u8> = Vec::from(input);
 
         for i in (1..buffer.len()).rev() {
@@ -27,12 +27,16 @@ impl Compressor for Diff8Filter {
             buffer[i] = data;
         }
 
+        let mut output = Vec::new();
+
         output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff8 as u8))?;
         output.write_u24::<LittleEndian>(buffer.len() as u32)?;
-        output.write_all(&buffer)
+        output.write_all(&buffer)?;
+
+        Ok(output)
     }
 
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
         let header = cursor.read_u8()?;
 
@@ -43,21 +47,21 @@ impl Compressor for Diff8Filter {
 
         let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
 
-        let mut buffer: Vec<u8> = vec![0; data_size];
-        cursor.read_exact(&mut buffer)?;
+        let mut output: Vec<u8> = vec![0; data_size];
+        cursor.read_exact(&mut output)?;
 
-        for i in 1..buffer.len() {
-            let data = buffer[i - 1].wrapping_add(buffer[i]);
-            buffer[i] = data;
+        for i in 1..output.len() {
+            let data = output[i - 1].wrapping_add(output[i]);
+            output[i] = data;
         }
 
-        assert_eq!(buffer.len(), data_size);
-        output.write_all(&buffer)
+        assert_eq!(output.len(), data_size);
+        Ok(output)
     }
 }
 
 impl Compressor for Diff16Filter {
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
         if input.len() % 2 == 0 {
             let mut buffer: Vec<u16> = vec![0; input.len() / 2];
             LittleEndian::read_u16_into(input, &mut buffer[..]);
@@ -77,15 +81,19 @@ impl Compressor for Diff16Filter {
             let mut buffer8: Vec<u8> = vec![0; input.len()];
             LittleEndian::write_u16_into(&buffer, &mut buffer8[..]);
 
+            let mut output = Vec::new();
+
             output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
             output.write_u24::<LittleEndian>(buffer8.len() as u32)?;
-            output.write_all(&buffer8)
+            output.write_all(&buffer8)?;
+
+            Ok(output)
         } else {
             Err(Error::new(ErrorKind::InvalidData, "Input must be a multiple of 2"))
         }
     }
 
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
         let header = cursor.read_u8()?;
 
@@ -108,11 +116,12 @@ impl Compressor for Diff16Filter {
         }
 
         // See: {byteorder_rant}
-        let mut buffer8: Vec<u8> = vec![0; data_size];
-        LittleEndian::write_u16_into(&buffer, &mut buffer8[..]);
+        let mut output: Vec<u8> = vec![0; data_size];
+        LittleEndian::write_u16_into(&buffer, &mut output[..]);
 
         assert_eq!(buffer.len(), data_size / 2);
-        assert_eq!(buffer8.len(), data_size);
-        output.write_all(&buffer8)
+        assert_eq!(output.len(), data_size);
+
+        Ok(output)
     }
 }

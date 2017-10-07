@@ -1,4 +1,4 @@
-use std::io::{Cursor, Read, Write, Result, Error, ErrorKind};
+use std::io::{Cursor, Read, Result, Error, ErrorKind};
 use byteorder::{LittleEndian, ReadBytesExt};
 use compressor::Compressor;
 use bios::{BiosCompressionType, bios_compression_type};
@@ -18,7 +18,7 @@ enum HuffmanNode {
 }
 
 impl Compressor for HuffmanCompressor {
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
         let header = cursor.read_u8()?;
 
@@ -58,24 +58,24 @@ impl Compressor for HuffmanCompressor {
             read_node(&tree_data, 0, false)?
         };
 
-        let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
+        let mut output: Vec<u8> = Vec::with_capacity(decompressed_size);
         let mut bits = cursor.read_u32::<LittleEndian>()?;
         let mut remaining_bits = 32;
         let mut current_node = &huffman_tree;
 
-        while buffer.len() < decompressed_size {
+        while output.len() < decompressed_size {
             if let &HuffmanNode::Branch { ref node0, ref node1 } = current_node {
                 current_node = if bits & 0x80000000 == 0 { node0 } else { node1 };
 
                 if let &HuffmanNode::Leaf { value } = current_node {
-                    buffer.push(value);
+                    output.push(value);
                     current_node = &huffman_tree;
                 }
 
                 bits <<= 1;
                 remaining_bits -= 1;
 
-                if (remaining_bits == 0) && (buffer.len() < decompressed_size) {
+                if (remaining_bits == 0) && (output.len() < decompressed_size) {
                     bits = cursor.read_u32::<LittleEndian>()?;
                     remaining_bits = 32;
                 }
@@ -84,11 +84,11 @@ impl Compressor for HuffmanCompressor {
             };
         }
 
-        assert_eq!(buffer.len(), decompressed_size);
-        output.write_all(&buffer)
+        assert_eq!(output.len(), decompressed_size);
+        Ok(output)
     }
 
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
         Err(Error::new(ErrorKind::Other, "Unimplemented compression routine"))
     }
 }

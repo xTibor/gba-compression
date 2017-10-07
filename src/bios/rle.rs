@@ -8,7 +8,7 @@ use utils::{consecutive_count, non_consecutive_count};
 pub struct RleCompressor;
 
 impl Compressor for RleCompressor {
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
 
         if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Rle) {
@@ -16,39 +16,40 @@ impl Compressor for RleCompressor {
         }
 
         let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
-        let mut buffer: Vec<u8> = Vec::with_capacity(decompressed_size);
+        let mut output: Vec<u8> = Vec::with_capacity(decompressed_size);
 
-        while buffer.len() < decompressed_size {
+        while output.len() < decompressed_size {
             let block = cursor.read_u8()? as usize;
             if block & 0x80 == 0 {
                 // Uncompressed
                 let length = (block & 0x7F) + 1;
-                if buffer.len() + length > decompressed_size {
+                if output.len() + length > decompressed_size {
                     return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
                 }
 
                 for _ in 0..length {
-                    buffer.push(cursor.read_u8()?);
+                    output.push(cursor.read_u8()?);
                 }
             } else {
                 // Run-length encoded
                 let length = (block & 0x7F) + 3;
-                if buffer.len() + length > decompressed_size {
+                if output.len() + length > decompressed_size {
                     return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
                 }
 
                 let data = cursor.read_u8()?;
                 for _ in 0..length {
-                    buffer.push(data);
+                    output.push(data);
                 }
             }
         }
 
-        assert_eq!(buffer.len(), decompressed_size);
-        output.write_all(&buffer)
+        assert_eq!(output.len(), decompressed_size);
+        Ok(output)
     }
 
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
         output.write_u8((BiosCompressionType::Rle as u8) << 4)?;
         output.write_u24::<LittleEndian>(input.len() as u32)?;
 
@@ -67,6 +68,6 @@ impl Compressor for RleCompressor {
             }
         }
 
-        Ok(())
+        Ok(output)
     }
 }

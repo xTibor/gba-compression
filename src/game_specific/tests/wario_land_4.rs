@@ -15,10 +15,8 @@ fn test_decompress_1() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4Rle8Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -35,10 +33,8 @@ fn test_decompress_2() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4Rle16Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -48,10 +44,8 @@ fn test_decompress_3() {
         0x01, 0x00,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4Rle8Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -61,10 +55,8 @@ fn test_decompress_4() {
         0x02, 0x00, 0x00,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4Rle16Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -72,12 +64,9 @@ fn test_decompress_4() {
 fn test_compress_and_decompress_1() {
     let input: Vec<u8> = Vec::new();
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4RleCompressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -90,12 +79,9 @@ fn test_compress_and_decompress_2() {
         0x06, 0x07, 0x08, 0x09, 0x09, 0x09, 0x09, 0x09,
     ];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4RleCompressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -103,11 +89,8 @@ fn test_compress_and_decompress_2() {
 fn test_compress_and_decompress_3() {
     let input: Vec<u8> = vec![0x42; 4096];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Wl4RleCompressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }

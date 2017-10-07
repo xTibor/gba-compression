@@ -25,7 +25,8 @@ pub struct Wl4RleCompressor {
 }
 
 impl Compressor for Wl4Rle8Compressor {
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
         output.write_u8(StreamType::Rle8 as u8)?;
 
         let mut offset = 0;
@@ -43,11 +44,13 @@ impl Compressor for Wl4Rle8Compressor {
             }
         }
 
-        output.write_u8(0)
+        output.write_u8(0)?;
+        Ok(output)
     }
 
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
+        let mut output = Vec::new();
 
         let stream_type = StreamType::from_u8(cursor.read_u8()?);
         if stream_type == Some(StreamType::Rle8) {
@@ -72,7 +75,7 @@ impl Compressor for Wl4Rle8Compressor {
                 }
             }
 
-            Ok(())
+            Ok(output)
         } else {
             Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle8 stream"))
         }
@@ -80,7 +83,8 @@ impl Compressor for Wl4Rle8Compressor {
 }
 
 impl Compressor for Wl4Rle16Compressor {
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
         output.write_u8(StreamType::Rle16 as u8)?;
 
         let mut offset = 0;
@@ -98,11 +102,13 @@ impl Compressor for Wl4Rle16Compressor {
             }
         }
 
-        output.write_u16::<BigEndian>(0)
+        output.write_u16::<BigEndian>(0)?;
+        Ok(output)
     }
 
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
+        let mut output = Vec::new();
 
         let stream_type = StreamType::from_u8(cursor.read_u8()?);
         if stream_type == Some(StreamType::Rle16) {
@@ -127,7 +133,7 @@ impl Compressor for Wl4Rle16Compressor {
                 }
             }
 
-            Ok(())
+            Ok(output)
         } else {
             Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle16 stream"))
         }
@@ -135,27 +141,24 @@ impl Compressor for Wl4Rle16Compressor {
 }
 
 impl Compressor for Wl4RleCompressor {
-    fn compress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
-        let mut output_rle8: Vec<u8> = Vec::new();
-        let mut output_rle16: Vec<u8> = Vec::new();
-
-        self.rle8_compressor.compress(input, &mut output_rle8)?;
-        self.rle16_compressor.compress(input, &mut output_rle16)?;
+    fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
+        let output_rle8 = self.rle8_compressor.compress(input)?;
+        let output_rle16 = self.rle16_compressor.compress(input)?;
 
         if output_rle8.len() < output_rle16.len() {
-            output.write_all(&output_rle8)
+            Ok(output_rle8)
         } else {
-            output.write_all(&output_rle16)
+            Ok(output_rle16)
         }
     }
 
-    fn decompress(&self, input: &[u8], output: &mut Vec<u8>) -> Result<()> {
+    fn decompress(&self, input: &[u8]) -> Result<Vec<u8>> {
         let mut cursor = Cursor::new(input);
         let stream_type = StreamType::from_u8(cursor.read_u8()?);
 
         match stream_type {
-            Some(StreamType::Rle8) => self.rle8_compressor.decompress(input, output),
-            Some(StreamType::Rle16) => self.rle16_compressor.decompress(input, output),
+            Some(StreamType::Rle8) => self.rle8_compressor.decompress(input),
+            Some(StreamType::Rle16) => self.rle16_compressor.decompress(input),
             None => Err(Error::new(ErrorKind::InvalidData, "Unknown WL4 stream type")),
         }
     }

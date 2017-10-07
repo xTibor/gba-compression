@@ -20,10 +20,8 @@ fn test_decompress_1() {
         0x01, 0x02, 0x03, 0x04,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -33,10 +31,8 @@ fn test_decompress_2() {
         0x10, 0x00, 0x00, 0x00,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.decompress(&input, &mut output).unwrap();
+    let output = compressor.decompress(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -47,10 +43,8 @@ fn test_compress_1() {
         0x10, 0x00, 0x00, 0x00,
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut output).unwrap();
+    let output = compressor.compress(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -58,12 +52,9 @@ fn test_compress_1() {
 fn test_compress_and_decompress_1() {
     let input: Vec<u8> = Vec::new();
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -76,12 +67,9 @@ fn test_compress_and_decompress_2() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -89,12 +77,9 @@ fn test_compress_and_decompress_2() {
 fn test_compress_and_decompress_3() {
     let input: Vec<u8> = vec![0x13; 4096];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -106,12 +91,9 @@ fn test_compress_and_decompress_4() {
         0x02, 0x03, 0x01, 0x02,
     ];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -123,10 +105,8 @@ fn test_compress_vram_safe_1() {
         0x20, 0xFF, 0xFF, 0xB0, 0x01
     ];
 
-    let mut output: Vec<u8> = Vec::new();
     let compressor = Lz77Compressor { vram_safe: true };
-
-    compressor.compress(&input, &mut output).unwrap();
+    let output = compressor.compress(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -134,11 +114,8 @@ fn test_compress_vram_safe_1() {
 fn test_compress_vram_safe_2() {
     let input: Vec<u8> = vec![0xFF; 4096];
 
-    let mut immediate: Vec<u8> = Vec::new();
-    let mut output: Vec<u8> = Vec::new();
-    let compressor = Lz77Compressor::default();
-
-    compressor.compress(&input, &mut immediate).unwrap();
-    compressor.decompress(&immediate, &mut output).unwrap();
+    let compressor = Lz77Compressor { vram_safe: true };
+    let immediate = compressor.compress(&input).unwrap();
+    let output = compressor.decompress(&immediate).unwrap();
     assert_eq!(input, output);
 }
