@@ -82,9 +82,8 @@ impl Compressor for Lz77Compressor {
             let max_length = cmp::min(input.len() - index, 18);
 
             let mut best_reference: Option<(usize, usize)> = None;
-            let mut current_offset = max_offset;
 
-            while current_offset >= min_offset {
+            for current_offset in min_offset..=max_offset {
                 let current_length = same_count(&input[index..], &input[index - current_offset..], max_length);
 
                 if current_length >= min_length {
@@ -96,8 +95,6 @@ impl Compressor for Lz77Compressor {
                         best_reference = Some((current_offset, current_length));
                     }
                 }
-
-                current_offset -= 1;
             }
 
             if let Some((best_offset, best_length)) = best_reference {
