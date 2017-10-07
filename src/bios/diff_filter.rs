@@ -20,18 +20,17 @@ enum_from_primitive! {
 
 impl Compressor for Diff8Filter {
     fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
-        let mut buffer: Vec<u8> = Vec::from(input);
-
-        for i in (1..buffer.len()).rev() {
-            let data = buffer[i].wrapping_sub(buffer[i - 1]);
-            buffer[i] = data;
-        }
-
-        let mut output = Vec::new();
+        let mut output = Vec::with_capacity(input.len() + 4);
 
         output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff8 as u8))?;
-        output.write_u24::<LittleEndian>(buffer.len() as u32)?;
-        output.write_all(&buffer)?;
+        output.write_u24::<LittleEndian>(input.len() as u32)?;
+
+        if input.len() > 0 {
+            output.write_u8(input[0])?;
+            for i in 1..input.len() {
+                output.write_u8(input[i].wrapping_sub(input[i - 1]))?;
+            }
+        }
 
         Ok(output)
     }
