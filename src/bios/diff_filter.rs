@@ -62,29 +62,20 @@ impl Compressor for Diff8Filter {
 impl Compressor for Diff16Filter {
     fn compress(&self, input: &[u8]) -> Result<Vec<u8>> {
         if input.len() % 2 == 0 {
-            let mut buffer: Vec<u16> = vec![0; input.len() / 2];
-            LittleEndian::read_u16_into(input, &mut buffer[..]);
-
-            for i in (1..buffer.len()).rev() {
-                let data = buffer[i].wrapping_sub(buffer[i - 1]);
-                buffer[i] = data;
-            }
-
-            // {byteorder_rant}
-            // I have to convert the `Vec<u16>` buffer back to `Vec<u8>`
-            // to be able to append it later to `output`.
-            // It's a shame that the `byteorder` has no `write_all` equivalent
-            // for u16 ints in `WriteBytesExt` to do this without a temp buffer.
-            // It has only in-place variants in `ByteOrder` but I want something that
-            // operates on a writer.
-            let mut buffer8: Vec<u8> = vec![0; input.len()];
-            LittleEndian::write_u16_into(&buffer, &mut buffer8[..]);
-
-            let mut output = Vec::new();
+            let mut output = Vec::with_capacity(input.len() + 4);
 
             output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
-            output.write_u24::<LittleEndian>(buffer8.len() as u32)?;
-            output.write_all(&buffer8)?;
+            output.write_u24::<LittleEndian>(input.len() as u32)?;
+
+            let mut input16: Vec<u16> = vec![0; input.len() / 2];
+            LittleEndian::read_u16_into(input, &mut input16[..]);
+
+            if input16.len() > 0 {
+                output.write_u16::<LittleEndian>(input16[0])?;
+                for i in 1..input16.len() {
+                    output.write_u16::<LittleEndian>(input16[i].wrapping_sub(input16[i - 1]))?;
+                }
+            }
 
             Ok(output)
         } else {
