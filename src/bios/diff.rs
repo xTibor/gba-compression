@@ -17,7 +17,7 @@ pub fn filter_diff8(input: &[u8]) -> Result<Vec<u8>> {
     output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (FilterType::Diff8 as u8))?;
     output.write_u24::<LittleEndian>(input.len() as u32)?;
 
-    if input.len() > 0 {
+    if !input.is_empty() {
         output.write_u8(input[0])?;
         for i in 1..input.len() {
             output.write_u8(input[i].wrapping_sub(input[i - 1]))?;
@@ -60,7 +60,7 @@ pub fn filter_diff16(input: &[u8]) -> Result<Vec<u8>> {
         let mut input16: Vec<u16> = vec![0; input.len() / 2];
         LittleEndian::read_u16_into(input, &mut input16[..]);
 
-        if input16.len() > 0 {
+        if !input16.is_empty() {
             output.write_u16::<LittleEndian>(input16[0])?;
             for i in 1..input16.len() {
                 output.write_u16::<LittleEndian>(input16[i].wrapping_sub(input16[i - 1]))?;
