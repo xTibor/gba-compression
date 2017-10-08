@@ -18,7 +18,7 @@ pub fn decompress_huffman(input: &[u8]) -> Result<Vec<u8>> {
     let header = cursor.read_u8()?;
 
     if bios_compression_type(header) != Some(BiosCompressionType::Huffman) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not a Huffman encoded stream"));
+        return Err(Error::new(ErrorKind::InvalidData, "compression header mismatch"));
     }
 
     let bit_length = header & 0xF;
@@ -31,7 +31,7 @@ pub fn decompress_huffman(input: &[u8]) -> Result<Vec<u8>> {
         cursor.read_exact(&mut tree_data)?;
 
         fn read_node(tree_data: &[u8], offset: usize, is_leaf: bool) -> Result<HuffmanNode> {
-            let node = *tree_data.get(offset).ok_or_else(|| Error::new(ErrorKind::InvalidData, "Node offset out of bounds"))?;
+            let node = *tree_data.get(offset).ok_or_else(|| Error::new(ErrorKind::InvalidData, "node offset out of bounds"))?;
 
             if is_leaf {
                 Ok(HuffmanNode::Leaf {
@@ -84,5 +84,5 @@ pub fn decompress_huffman(input: &[u8]) -> Result<Vec<u8>> {
 }
 
 pub fn compress_huffman(input: &[u8]) -> Result<Vec<u8>> {
-    Err(Error::new(ErrorKind::Other, "Unimplemented compression routine"))
+    Err(Error::new(ErrorKind::Other, "unimplemented"))
 }

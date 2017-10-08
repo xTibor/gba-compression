@@ -7,7 +7,7 @@ pub fn decompress_rle(input: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = Cursor::new(input);
 
     if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Rle) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not an run-length encoded stream"));
+        return Err(Error::new(ErrorKind::InvalidData, "compression header mismatch"));
     }
 
     let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
@@ -19,7 +19,7 @@ pub fn decompress_rle(input: &[u8]) -> Result<Vec<u8>> {
             // Uncompressed
             let length = (block & 0x7F) + 1;
             if output.len() + length > decompressed_size {
-                return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
+                return Err(Error::new(ErrorKind::InvalidData, "length out of bounds"));
             }
 
             for _ in 0..length {
@@ -29,7 +29,7 @@ pub fn decompress_rle(input: &[u8]) -> Result<Vec<u8>> {
             // Run-length encoded
             let length = (block & 0x7F) + 3;
             if output.len() + length > decompressed_size {
-                return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
+                return Err(Error::new(ErrorKind::InvalidData, "length out of bounds"));
             }
 
             let data = cursor.read_u8()?;

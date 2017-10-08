@@ -63,7 +63,7 @@ pub fn decompress_wl4_rle8(input: &[u8]) -> Result<Vec<u8>> {
 
         Ok(output)
     } else {
-        Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle8 stream"))
+        Err(Error::new(ErrorKind::InvalidData, "compression header mismatch"))
     }
 }
 
@@ -119,7 +119,7 @@ pub fn decompress_wl4_rle16(input: &[u8]) -> Result<Vec<u8>> {
 
         Ok(output)
     } else {
-        Err(Error::new(ErrorKind::InvalidData, "Not a Wl4Rle16 stream"))
+        Err(Error::new(ErrorKind::InvalidData, "compression header mismatch"))
     }
 }
 
@@ -141,6 +141,6 @@ pub fn decompress_wl4_rle(input: &[u8]) -> Result<Vec<u8>> {
     match stream_type {
         Some(StreamType::Rle8) => decompress_wl4_rle8(input),
         Some(StreamType::Rle16) => decompress_wl4_rle16(input),
-        None => Err(Error::new(ErrorKind::InvalidData, "Unknown WL4 stream type")),
+        None => Err(Error::new(ErrorKind::InvalidData, "unknown compression header")),
     }
 }

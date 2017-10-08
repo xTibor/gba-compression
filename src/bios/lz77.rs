@@ -8,7 +8,7 @@ pub fn decompress_lz77(input: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = Cursor::new(input);
 
     if bios_compression_type(cursor.read_u8()?) != Some(BiosCompressionType::Lz77) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not an LZ77 encoded stream"));
+        return Err(Error::new(ErrorKind::InvalidData, "compression header mismatch"));
     }
 
     let decompressed_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
@@ -23,17 +23,17 @@ pub fn decompress_lz77(input: &[u8]) -> Result<Vec<u8>> {
                     // Uncompressed
                     output.push(cursor.read_u8()?);
                 } else {
-                    // Backreference
+                    // Reference
                     let block = cursor.read_u16::<LittleEndian>()? as usize;
                     let length = ((block >> 4) & 0xF) + 3;
                     let offset = (((block & 0xF) << 8) | ((block >> 8) & 0xFF)) + 1;
 
                     if output.len() + length > decompressed_size {
-                        return Err(Error::new(ErrorKind::InvalidData, "Length out of bounds"));
+                        return Err(Error::new(ErrorKind::InvalidData, "length out of bounds"));
                     }
 
                     if offset > output.len() {
-                        return Err(Error::new(ErrorKind::InvalidData, "Offset out of bounds"));
+                        return Err(Error::new(ErrorKind::InvalidData, "offset out of bounds"));
                     }
 
                     for _ in 0..length {
@@ -55,7 +55,7 @@ pub fn compress_lz77(input: &[u8], vram_safe: bool) -> Result<Vec<u8>> {
         Uncompressed {
             data: u8,
         },
-        Backreference {
+        Reference {
             offset: u16,
             length: u8,
         }
@@ -91,7 +91,7 @@ pub fn compress_lz77(input: &[u8], vram_safe: bool) -> Result<Vec<u8>> {
         }
 
         if let Some((best_offset, best_length)) = best_reference {
-            blocks.push(Block::Backreference {
+            blocks.push(Block::Reference {
                 offset: best_offset as u16,
                 length: best_length as u8,
             });
@@ -109,7 +109,7 @@ pub fn compress_lz77(input: &[u8], vram_safe: bool) -> Result<Vec<u8>> {
     for chunk in blocks.chunks(8) {
         let mut block_types = 0;
         for (i, block) in chunk.iter().enumerate() {
-            if let Block::Backreference { .. } = *block  {
+            if let Block::Reference { .. } = *block  {
                 block_types |= 0x80 >> i;
             }
         }
@@ -120,13 +120,9 @@ pub fn compress_lz77(input: &[u8], vram_safe: bool) -> Result<Vec<u8>> {
                 Block::Uncompressed { data } => {
                     output.write_u8(data)?;
                 },
-                Block::Backreference { offset, length } => {
-                    assert!((length >= 3) & (length <= 18), "length must be between 3 and 18");
-                    if vram_safe {
-                        assert!((offset >= 2) & (offset <= 4096), "offset must be between 2 and 4096");
-                    } else {
-                        assert!((offset >= 1) & (offset <= 4096), "offset must be between 1 and 4096");
-                    }
+                Block::Reference { offset, length } => {
+                    assert!((length >= 3) & (length <= 18), "length out of bounds");
+                    assert!((offset >= 1) & (offset <= 4096), "offset out of bounds");
 
                     let data = (((offset - 1) & 0xFF) << 8) | ((length - 3) << 4) as u16 | ((offset - 1) >> 8);
                     output.write_u16::<LittleEndian>(data)?;

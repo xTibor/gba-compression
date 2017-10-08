@@ -33,7 +33,7 @@ pub fn unfilter_diff8(input: &[u8]) -> Result<Vec<u8>> {
 
     if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
         (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff8)) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not a Diff8 stream"));
+        return Err(Error::new(ErrorKind::InvalidData, "filter header mismatch"));
     }
 
     let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
@@ -69,7 +69,7 @@ pub fn filter_diff16(input: &[u8]) -> Result<Vec<u8>> {
 
         Ok(output)
     } else {
-        Err(Error::new(ErrorKind::InvalidData, "Input must be a multiple of 2"))
+        Err(Error::new(ErrorKind::InvalidData, "data size must be some multiple of 2"))
     }
 }
 
@@ -79,12 +79,12 @@ pub fn unfilter_diff16(input: &[u8]) -> Result<Vec<u8>> {
 
     if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
         (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff16)) {
-        return Err(Error::new(ErrorKind::InvalidData, "Not a Diff16 stream"));
+        return Err(Error::new(ErrorKind::InvalidData, "filter header mismatch"));
     }
 
     let data_size: usize = cursor.read_u24::<LittleEndian>()? as usize;
     if data_size % 2 != 0 {
-        return Err(Error::new(ErrorKind::InvalidData, "Size must be a multiple of 2"));
+        return Err(Error::new(ErrorKind::InvalidData, "data size must be some multiple of 2"));
     }
 
     let mut buffer: Vec<u16> = vec![0; data_size / 2];
@@ -95,7 +95,6 @@ pub fn unfilter_diff16(input: &[u8]) -> Result<Vec<u8>> {
         buffer[i] = data;
     }
 
-    // See: {byteorder_rant}
     let mut output: Vec<u8> = vec![0; data_size];
     LittleEndian::write_u16_into(&buffer, &mut output[..]);
 
