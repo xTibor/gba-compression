@@ -5,7 +5,7 @@ use num::FromPrimitive;
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
-    enum StreamType {
+    enum FilterType {
         Diff8  = 1,
         Diff16 = 2,
     }
@@ -14,7 +14,7 @@ enum_from_primitive! {
 pub fn filter_diff8(input: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(input.len() + 4);
 
-    output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff8 as u8))?;
+    output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (FilterType::Diff8 as u8))?;
     output.write_u24::<LittleEndian>(input.len() as u32)?;
 
     if input.len() > 0 {
@@ -32,7 +32,7 @@ pub fn unfilter_diff8(input: &[u8]) -> Result<Vec<u8>> {
     let header = cursor.read_u8()?;
 
     if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
-        (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff8)) {
+        (FilterType::from_u8(header & 0xF) != Some(FilterType::Diff8)) {
         return Err(Error::new(ErrorKind::InvalidData, "filter header mismatch"));
     }
 
@@ -54,7 +54,7 @@ pub fn filter_diff16(input: &[u8]) -> Result<Vec<u8>> {
     if input.len() % 2 == 0 {
         let mut output = Vec::with_capacity(input.len() + 4);
 
-        output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (StreamType::Diff16 as u8))?;
+        output.write_u8(((BiosCompressionType::DiffFilter as u8) << 4) | (FilterType::Diff16 as u8))?;
         output.write_u24::<LittleEndian>(input.len() as u32)?;
 
         let mut input16: Vec<u16> = vec![0; input.len() / 2];
@@ -78,7 +78,7 @@ pub fn unfilter_diff16(input: &[u8]) -> Result<Vec<u8>> {
     let header = cursor.read_u8()?;
 
     if (bios_compression_type(header) != Some(BiosCompressionType::DiffFilter)) ||
-        (StreamType::from_u8(header & 0xF) != Some(StreamType::Diff16)) {
+        (FilterType::from_u8(header & 0xF) != Some(FilterType::Diff16)) {
         return Err(Error::new(ErrorKind::InvalidData, "filter header mismatch"));
     }
 

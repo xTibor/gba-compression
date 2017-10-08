@@ -5,7 +5,7 @@ use utils::{consecutive_count, non_consecutive_count};
 
 enum_from_primitive! {
     #[derive(Debug, Eq, PartialEq)]
-    enum StreamType {
+    enum RleType {
         Rle8  = 1,
         Rle16 = 2,
     }
@@ -13,7 +13,7 @@ enum_from_primitive! {
 
 pub fn compress_wl4_rle8(input: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    output.write_u8(StreamType::Rle8 as u8)?;
+    output.write_u8(RleType::Rle8 as u8)?;
 
     let mut offset = 0;
     while offset < input.len() {
@@ -38,12 +38,12 @@ pub fn decompress_wl4_rle8(input: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = Cursor::new(input);
     let mut output = Vec::new();
 
-    let stream_type = StreamType::from_u8(cursor.read_u8()?);
-    if stream_type == Some(StreamType::Rle8) {
+    let rle_type = RleType::from_u8(cursor.read_u8()?);
+    if rle_type == Some(RleType::Rle8) {
         loop {
             let block = cursor.read_u8()?;
             if block == 0 {
-                // End of stream
+                // End of data
                 break;
             } else if block & 0x80 == 0 {
                 // Uncompressed
@@ -69,7 +69,7 @@ pub fn decompress_wl4_rle8(input: &[u8]) -> Result<Vec<u8>> {
 
 pub fn compress_wl4_rle16(input: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    output.write_u8(StreamType::Rle16 as u8)?;
+    output.write_u8(RleType::Rle16 as u8)?;
 
     let mut offset = 0;
     while offset < input.len() {
@@ -94,12 +94,12 @@ pub fn decompress_wl4_rle16(input: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = Cursor::new(input);
     let mut output = Vec::new();
 
-    let stream_type = StreamType::from_u8(cursor.read_u8()?);
-    if stream_type == Some(StreamType::Rle16) {
+    let rle_type = RleType::from_u8(cursor.read_u8()?);
+    if rle_type == Some(RleType::Rle16) {
         loop {
             let block = cursor.read_u16::<BigEndian>()?;
             if block == 0 {
-                // End of stream
+                // End of data
                 break;
             } else if block & 0x8000 == 0 {
                 // Uncompressed
@@ -136,11 +136,11 @@ pub fn compress_wl4_rle(input: &[u8]) -> Result<Vec<u8>> {
 
 pub fn decompress_wl4_rle(input: &[u8]) -> Result<Vec<u8>> {
     let mut cursor = Cursor::new(input);
-    let stream_type = StreamType::from_u8(cursor.read_u8()?);
+    let rle_type = RleType::from_u8(cursor.read_u8()?);
 
-    match stream_type {
-        Some(StreamType::Rle8) => decompress_wl4_rle8(input),
-        Some(StreamType::Rle16) => decompress_wl4_rle16(input),
+    match rle_type {
+        Some(RleType::Rle8) => decompress_wl4_rle8(input),
+        Some(RleType::Rle16) => decompress_wl4_rle16(input),
         None => Err(Error::new(ErrorKind::InvalidData, "unknown compression header")),
     }
 }
