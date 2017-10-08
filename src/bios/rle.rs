@@ -23,7 +23,7 @@ pub fn decompress_rle(input: &[u8]) -> Result<Vec<u8>> {
             }
 
             for _ in 0..length {
-                output.push(cursor.read_u8()?);
+                output.write_u8(cursor.read_u8()?)?;
             }
         } else {
             // Run-length encoded
@@ -34,7 +34,7 @@ pub fn decompress_rle(input: &[u8]) -> Result<Vec<u8>> {
 
             let data = cursor.read_u8()?;
             for _ in 0..length {
-                output.push(data);
+                output.write_u8(data)?;
             }
         }
     }

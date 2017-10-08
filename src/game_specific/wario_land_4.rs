@@ -49,14 +49,14 @@ pub fn decompress_wl4_rle8(input: &[u8]) -> Result<Vec<u8>> {
                 // Uncompressed
                 let length = block & 0x7F;
                 for _ in 0..length {
-                    output.push(cursor.read_u8()?);
+                    output.write_u8(cursor.read_u8()?)?;
                 }
             } else {
                 // Run-length encoded
                 let length = block & 0x7F;
                 let data = cursor.read_u8()?;
                 for _ in 0..length {
-                    output.push(data);
+                    output.write_u8(data)?;
                 }
             }
         }
@@ -105,14 +105,14 @@ pub fn decompress_wl4_rle16(input: &[u8]) -> Result<Vec<u8>> {
                 // Uncompressed
                 let length = block & 0x7FFF;
                 for _ in 0..length {
-                    output.push(cursor.read_u8()?);
+                    output.write_u8(cursor.read_u8()?)?;
                 }
             } else {
                 // Run-length encoded
                 let length = block & 0x7FFF;
                 let data = cursor.read_u8()?;
                 for _ in 0..length {
-                    output.push(data);
+                    output.write_u8(data)?;
                 }
             }
         }

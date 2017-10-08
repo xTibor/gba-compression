@@ -21,7 +21,7 @@ pub fn decompress_lz77(input: &[u8]) -> Result<Vec<u8>> {
             if output.len() < decompressed_size {
                 if block_types & (0x80 >> i) == 0 {
                     // Uncompressed
-                    output.push(cursor.read_u8()?);
+                    output.write_u8(cursor.read_u8()?)?;
                 } else {
                     // Reference
                     let block = cursor.read_u16::<LittleEndian>()? as usize;
@@ -39,7 +39,7 @@ pub fn decompress_lz77(input: &[u8]) -> Result<Vec<u8>> {
                     for _ in 0..length {
                         let index = output.len() - offset;
                         let byte = output[index];
-                        output.push(byte);
+                        output.write_u8(byte)?;
                     }
                 }
             }
