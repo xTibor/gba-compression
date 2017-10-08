@@ -1,5 +1,4 @@
-use compressor::Compressor;
-use bios::RleCompressor;
+use bios::{compress_rle, decompress_rle};
 
 #[test]
 fn test_decompress_1() {
@@ -13,8 +12,7 @@ fn test_decompress_1() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let compressor = RleCompressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_rle(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -25,8 +23,7 @@ fn test_decompress_2() {
         0x04, 0x01, 0x02, 0x03, 0x04, 0x05,
     ];
 
-    let compressor = RleCompressor::default();
-    assert!(compressor.decompress(&input).is_err());
+    assert!(decompress_rle(&input).is_err());
 }
 
 #[test]
@@ -36,8 +33,7 @@ fn test_decompress_3() {
         0x82, 0x01,
     ];
 
-    let compressor = RleCompressor::default();
-    assert!(compressor.decompress(&input).is_err());
+    assert!(decompress_rle(&input).is_err());
 }
 
 #[test]
@@ -46,8 +42,7 @@ fn test_decompress_4() {
         0x30, 0x00, 0x00, 0x00,
     ];
 
-    let compressor = RleCompressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_rle(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -55,9 +50,8 @@ fn test_decompress_4() {
 fn test_compress_and_decompress_1() {
     let input: Vec<u8> = Vec::new();
 
-    let compressor = RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_rle(&input).unwrap();
+    let output = decompress_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -70,9 +64,8 @@ fn test_compress_and_decompress_2() {
         0x06, 0x07, 0x08, 0x09, 0x09, 0x09, 0x09, 0x09,
     ];
 
-    let compressor = RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_rle(&input).unwrap();
+    let output = decompress_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -80,8 +73,7 @@ fn test_compress_and_decompress_2() {
 fn test_compress_and_decompress_3() {
     let input: Vec<u8> = vec![0x42; 4096];
 
-    let compressor = RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_rle(&input).unwrap();
+    let output = decompress_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }

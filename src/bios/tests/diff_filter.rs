@@ -1,5 +1,5 @@
-use compressor::Compressor;
-use bios::{Diff8Filter, Diff16Filter};
+use bios::{filter_diff8, unfilter_diff8};
+use bios::{filter_diff16, unfilter_diff16};
 
 #[test]
 fn test_unfilter_1() {
@@ -18,8 +18,7 @@ fn test_unfilter_1() {
         0xD0, 0xE0, 0xF0, 0x00,
     ];
 
-    let compressor = Diff8Filter::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = unfilter_diff8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -40,8 +39,7 @@ fn test_unfilter_2() {
         0x16, 0x10, 0x17, 0x10,
     ];
 
-    let compressor = Diff16Filter::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = unfilter_diff16(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -58,8 +56,7 @@ fn test_filter_diff8_1() {
         0x00, 0x00, 0x00, 0x00,
     ];
 
-    let compressor = Diff8Filter::default();
-    let output = compressor.compress(&input).unwrap();
+    let output = filter_diff8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -76,8 +73,7 @@ fn test_filter_diff8_2() {
         0x01, 0x01, 0x01, 0x01,
     ];
 
-    let compressor = Diff8Filter::default();
-    let output = compressor.compress(&input).unwrap();
+    let output = filter_diff8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -94,8 +90,7 @@ fn test_filter_diff8_3() {
         0xFF, 0xFF, 0xFF, 0xFF,
     ];
 
-    let compressor = Diff8Filter::default();
-    let output = compressor.compress(&input).unwrap();
+    let output = filter_diff8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -106,8 +101,7 @@ fn test_filter_diff8_4() {
         0x81, 0x00, 0x00, 0x00,
     ];
 
-    let compressor = Diff8Filter::default();
-    let output = compressor.compress(&input).unwrap();
+    let output = filter_diff8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -120,9 +114,8 @@ fn test_filter_unfilter_diff8_1() {
         0x8C, 0xA1, 0xD4, 0x48, 0xEA, 0xC9, 0x9E, 0x90,
     ];
 
-    let compressor = Diff8Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff8(&input).unwrap();
+    let output = unfilter_diff8(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -130,9 +123,8 @@ fn test_filter_unfilter_diff8_1() {
 fn test_filter_unfilter_diff8_2() {
     let input: Vec<u8> = Vec::new();
 
-    let compressor = Diff8Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff8(&input).unwrap();
+    let output = unfilter_diff8(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -140,9 +132,8 @@ fn test_filter_unfilter_diff8_2() {
 fn test_filter_unfilter_diff8_3() {
     let input: Vec<u8> = vec![0x42; 4096];
 
-    let compressor = Diff8Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff8(&input).unwrap();
+    let output = unfilter_diff8(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -155,9 +146,8 @@ fn test_filter_unfilter_diff16_1() {
         0x8C, 0xA1, 0xD4, 0x48, 0xEA, 0xC9, 0x9E, 0x90,
     ];
 
-    let compressor = Diff16Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff16(&input).unwrap();
+    let output = unfilter_diff16(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -165,9 +155,8 @@ fn test_filter_unfilter_diff16_1() {
 fn test_filter_unfilter_diff16_2() {
     let input: Vec<u8> = Vec::new();
 
-    let compressor = Diff16Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff16(&input).unwrap();
+    let output = unfilter_diff16(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -175,8 +164,7 @@ fn test_filter_unfilter_diff16_2() {
 fn test_filter_unfilter_diff16_3() {
     let input: Vec<u8> = vec![0x42; 4096];
 
-    let compressor = Diff16Filter::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = filter_diff16(&input).unwrap();
+    let output = unfilter_diff16(&immediate).unwrap();
     assert_eq!(input, output);
 }

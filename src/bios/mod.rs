@@ -6,10 +6,11 @@ mod huffman;
 mod lz77;
 mod rle;
 
-pub use self::diff_filter::{Diff8Filter, Diff16Filter};
-pub use self::huffman::HuffmanCompressor;
-pub use self::lz77::Lz77Compressor;
-pub use self::rle::RleCompressor;
+pub use self::diff_filter::{filter_diff8, unfilter_diff8};
+pub use self::diff_filter::{filter_diff16, unfilter_diff16};
+pub use self::huffman::{compress_huffman, decompress_huffman};
+pub use self::lz77::{compress_lz77, decompress_lz77};
+pub use self::rle::{compress_rle, decompress_rle};
 
 use num::FromPrimitive;
 

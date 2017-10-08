@@ -1,6 +1,6 @@
-use compressor::Compressor;
-use game_specific::wario_land_4::{Wl4RleCompressor, Wl4Rle8Compressor, Wl4Rle16Compressor};
-use std::io::{Cursor, Seek, SeekFrom};
+use game_specific::wario_land_4::{compress_wl4_rle8, decompress_wl4_rle8};
+use game_specific::wario_land_4::{compress_wl4_rle16, decompress_wl4_rle16};
+use game_specific::wario_land_4::{compress_wl4_rle, decompress_wl4_rle};
 
 #[test]
 fn test_decompress_1() {
@@ -15,8 +15,7 @@ fn test_decompress_1() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let compressor = Wl4Rle8Compressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_wl4_rle8(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -33,8 +32,7 @@ fn test_decompress_2() {
         0x05, 0x05, 0x05, 0x05,
     ];
 
-    let compressor = Wl4Rle16Compressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_wl4_rle16(&input).unwrap();
     assert_eq!(output, expected_output);
 }
 
@@ -44,8 +42,7 @@ fn test_decompress_3() {
         0x01, 0x00,
     ];
 
-    let compressor = Wl4Rle8Compressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_wl4_rle8(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -55,8 +52,7 @@ fn test_decompress_4() {
         0x02, 0x00, 0x00,
     ];
 
-    let compressor = Wl4Rle16Compressor::default();
-    let output = compressor.decompress(&input).unwrap();
+    let output = decompress_wl4_rle16(&input).unwrap();
     assert!(output.is_empty());
 }
 
@@ -64,9 +60,8 @@ fn test_decompress_4() {
 fn test_compress_and_decompress_1() {
     let input: Vec<u8> = Vec::new();
 
-    let compressor = Wl4RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_wl4_rle(&input).unwrap();
+    let output = decompress_wl4_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -79,9 +74,8 @@ fn test_compress_and_decompress_2() {
         0x06, 0x07, 0x08, 0x09, 0x09, 0x09, 0x09, 0x09,
     ];
 
-    let compressor = Wl4RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_wl4_rle(&input).unwrap();
+    let output = decompress_wl4_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }
 
@@ -89,8 +83,7 @@ fn test_compress_and_decompress_2() {
 fn test_compress_and_decompress_3() {
     let input: Vec<u8> = vec![0x42; 4096];
 
-    let compressor = Wl4RleCompressor::default();
-    let immediate = compressor.compress(&input).unwrap();
-    let output = compressor.decompress(&immediate).unwrap();
+    let immediate = compress_wl4_rle(&input).unwrap();
+    let output = decompress_wl4_rle(&immediate).unwrap();
     assert_eq!(input, output);
 }
