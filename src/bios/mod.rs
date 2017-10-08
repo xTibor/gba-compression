@@ -1,13 +1,13 @@
 #[cfg(test)]
 mod tests;
 
-mod diff_filter;
+mod diff;
 mod huffman;
 mod lz77;
 mod rle;
 
-pub use self::diff_filter::{filter_diff8, unfilter_diff8};
-pub use self::diff_filter::{filter_diff16, unfilter_diff16};
+pub use self::diff::{filter_diff8, unfilter_diff8};
+pub use self::diff::{filter_diff16, unfilter_diff16};
 pub use self::huffman::{compress_huffman, decompress_huffman};
 pub use self::lz77::{compress_lz77, decompress_lz77};
 pub use self::rle::{compress_rle, decompress_rle};
